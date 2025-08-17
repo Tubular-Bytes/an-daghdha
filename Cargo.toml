@@ -1,0 +1,18 @@
+[package]
+name = "an-daghdha"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.99"
+chrono = "0.4.41"
+diesel = { version = "2.2.12", features = ["postgres"] }
+dotenvy = "0.15"
+futures-channel = "0.3.31"
+futures-util = "0.3.31"
+serde = "1.0.219"
+serde_json = "1.0.142"
+tokio = { version = "1.47.1", features = ["full"] }
+tokio-tungstenite = "0.27.0"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
