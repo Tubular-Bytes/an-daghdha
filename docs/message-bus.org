@@ -1,15 +1,16 @@
 * Message bus planning
 
-what if the broker IS the bus? no logic, just relaying messages.
+Topics are logical separation between messages, it uses the same broadcast channel, topic is encapsulated in the message, actors decide what they process.
+This way actors can listen to topics by a wildcard and then use match statements to filter the selected tasks.
 
-topics are logical separation between messages, it uses the same broadcast channel, topic is encapsulated in the message, actors decide what they process.
+Message types depending on communication participants:
 
-** Application -> All
-shutdown
-** API -> Actors
-auth, task topic
-** Ticker -> Actors
-tick topic
+- Application -> All
+  shutdown
+- API -> Actors
+  auth, task
+- Ticker -> Actors
+  tick
 
 * Actor types
 

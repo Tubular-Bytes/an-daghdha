@@ -1,47 +1,31 @@
 
 # Table of Contents
 
-1.  [Message bus planning](#org74835c2)
-    1.  [Application -> All](#org7eea1e9)
-    2.  [API -> Actors](#org3d6a36f)
-    3.  [Ticker -> Actors](#orgf49a130)
-2.  [Actor types](#orgd42b0a5)
-    1.  [Authentication and authorization](#org4fba9f7)
-    2.  [Storage](#org38202a3)
-    3.  [Inventory](#org402acfc)
+1.  [Message bus planning](#org67069e1)
+2.  [Actor types](#orgca037f6)
+    1.  [Authentication and authorization](#orgc84fca6)
+    2.  [Storage](#org9e94326)
+    3.  [Inventory](#org15bf85a)
 
 
-<a id="org74835c2"></a>
+<a id="org67069e1"></a>
 
 # Message bus planning
 
-what if the broker IS the bus? no logic, just relaying messages.
+Topics are logical separation between messages, it uses the same broadcast channel, topic is encapsulated in the message, actors decide what they process.
+This way actors can listen to topics by a wildcard and then use match statements to filter the selected tasks.
 
-topics are logical separation between messages, it uses the same broadcast channel, topic is encapsulated in the message, actors decide what they process.
+Message types depending on communication participants:
 
-
-<a id="org7eea1e9"></a>
-
-## Application -> All
-
-shutdown
-
-
-<a id="org3d6a36f"></a>
-
-## API -> Actors
-
-auth, task topic
+-   Application -> All
+    shutdown
+-   API -> Actors
+    auth, task
+-   Ticker -> Actors
+    tick
 
 
-<a id="orgf49a130"></a>
-
-## Ticker -> Actors
-
-tick topic
-
-
-<a id="orgd42b0a5"></a>
+<a id="orgca037f6"></a>
 
 # Actor types
 
@@ -50,7 +34,7 @@ Storage - responsible for distributing IO for the database - direct database acc
 Inventory - represents a single account, keeps track of assets - database access through Storage actor
 
 
-<a id="org4fba9f7"></a>
+<a id="orgc84fca6"></a>
 
 ## Authentication and authorization
 
@@ -60,14 +44,14 @@ Inventory - represents a single account, keeps track of assets - database access
     Task should include PASETO token and the reply channel.
 
 
-<a id="org38202a3"></a>
+<a id="org9e94326"></a>
 
 ## Storage
 
 Inventory actors are responsible for persisting and caching data but these operations happen through the Storage actor. This actor listens for the usual CRUD operations and perform the tasks asynchronously. They emit two replies: one is instant, acknowledging the operation or returning possible validation errors, the other is sent via the reply channel if it&rsquo;s included in the task. This reply is optional for most operations except `read`: this operation requires the reply channel to send the requested value.
 
 
-<a id="org402acfc"></a>
+<a id="org15bf85a"></a>
 
 ## Inventory
 
