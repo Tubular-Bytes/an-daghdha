@@ -32,3 +32,45 @@ Inventory actors are responsible for persisting and caching data but these opera
 ** Inventory
 
 These actors manipulate the database via the storage layer to indicate state changes for assets they manage: resources, buildings, etc...
+
+* Message types
+
+Different message types are wrapped inside a Message enum for versatility and ease of use. The embedded types can take whatever form it requires to convey values over the bus.
+
+** shutdown
+#+begin_src
+struct Shutdown {}
+#+end_src
+
+** authentication
+#+begin_src
+struct Authentication {
+        username: String,
+        password: String,
+        reply: tokio::sync::oneshot::Sender<AuthenticationResponse>
+}
+#+end_src
+
+** authorization
+#+begin_src
+struct Authorization {
+        token: String,
+        reply: tokio::sync::oneshot::Sender<AuthorizationResponse>
+}
+#+end_src
+
+** tick
+#+begin_src
+struct Tick {}
+#+end_src
+
+** task
+Tasks will be a special kind of structure because it will contain an embedded type as tasks can be different kinds with different attributes.
+
+#+begin_src
+enum Task {
+        Build(inventory_id, blueprint_id),
+        Train(inventory_id, formula_id),
+        Produce(inventory_id, recipe_id),
+}
+#+end_src

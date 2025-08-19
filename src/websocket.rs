@@ -12,17 +12,19 @@ use tokio_tungstenite::tungstenite::{
     protocol::Message,
 };
 
+use crate::bus::model::Message as BusMessage;
+
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
 
 #[derive(Clone)]
 pub struct Bouncer {
     peers: PeerMap,
-    bus_tx: tokio::sync::mpsc::Sender<String>,
+    bus_tx: tokio::sync::broadcast::Sender<BusMessage>,
 }
 
 impl Bouncer {
-    pub fn new(bus_tx: tokio::sync::mpsc::Sender<String>) -> Self {
+    pub fn new(bus_tx: tokio::sync::broadcast::Sender<BusMessage>) -> Self {
         Bouncer {
             peers: Arc::new(Mutex::new(HashMap::new())),
             bus_tx,
@@ -39,14 +41,13 @@ impl Bouncer {
             Ok(response)
         };
 
-        let mut ws_stream = match tokio_tungstenite::accept_hdr_async(stream, callback)
-            .await {
-                Ok(stream) => stream,
-                Err(err) => {
-                    tracing::error!("Error during the websocket handshake: {}", err);
-                    return;
-                }
-            };
+        let mut ws_stream = match tokio_tungstenite::accept_hdr_async(stream, callback).await {
+            Ok(stream) => stream,
+            Err(err) => {
+                tracing::error!("Error during the websocket handshake: {}", err);
+                return;
+            }
+        };
         tracing::debug!("webSocket connection established: {}", addr);
 
         // Insert the write part of this peer to the peer map.
@@ -82,7 +83,7 @@ impl Bouncer {
             .map_err(|e| anyhow::anyhow!("Failed to parse message: {}", e))?;
         tracing::debug!("parsed message: {msg:?}");
 
-        if let Err(e) = self.bus_tx.send(msg.to_string()).await {
+        if let Err(e) = self.bus_tx.send(BusMessage::Example(msg.to_string())) {
             tracing::error!("Error sending message to bus: {}", e);
         }
 
