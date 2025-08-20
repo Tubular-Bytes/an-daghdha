@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use regex::Regex;
 use tokio::sync::{broadcast, mpsc, RwLock};
@@ -17,6 +14,7 @@ pub enum Status {
 #[derive(Debug, Clone)]
 pub enum MessageBody {
     Example { foo: String },
+    ExampleResponse { foo: String },
     Stop,
 }
 
@@ -25,6 +23,7 @@ pub struct Message {
     pub id: Uuid,
     pub body: MessageBody,
     pub topic: Option<String>,
+    pub reply: Option<String>,
     pub timestamp: u64,
 }
 
@@ -42,6 +41,7 @@ impl Topic {
 }
 
 pub struct Subscription {
+    pub id: Uuid,
     pub pattern: Regex,
     pub tx: mpsc::Sender<Message>,
 }
@@ -50,10 +50,11 @@ impl Subscription {
     pub fn new(pattern: &str) -> Result<(Self, mpsc::Receiver<Message>), regex::Error> {
         let regex = Regex::new(pattern)?;
         let (tx, rx) = mpsc::channel(100);
-        Ok((Self { pattern: regex, tx }, rx))
+        Ok((Self { id: Uuid::new_v4(), pattern: regex, tx }, rx))
     }
 }
 
+#[derive(Clone)]
 pub struct MessageBroker {
     tx: mpsc::Sender<Message>,
     subscriptions: Arc<RwLock<Vec<Subscription>>>,
@@ -78,17 +79,28 @@ impl MessageBroker {
         self.tx.send(message).await
     }
     
-    pub async fn subscribe(&self, pattern: &str) -> Result<mpsc::Receiver<Message>, regex::Error> {
+    pub async fn subscribe(&self, pattern: &str) -> Result<(Uuid, mpsc::Receiver<Message>), regex::Error> {
         let (subscription, rx) = Subscription::new(pattern)?;
+        let subscription_id = subscription.id;
         self.subscriptions.write().await.push(subscription);
-        Ok(rx)
+        Ok((subscription_id, rx))
+    }
+    
+    pub async fn unsubscribe(&self, subscription_id: Uuid) -> Result<(), String> {
+        tracing::info!("Unsubscribing from subscription ID: {}", subscription_id);
+        let mut subscriptions = self.subscriptions.write().await;
+        if let Some(pos) = subscriptions.iter().position(|s| s.id == subscription_id) {
+            subscriptions.remove(pos);
+            Ok(())
+        } else {
+            Err("Subscription not found".to_string())
+        }
     }
 }
 
 pub struct MessageHandler {
     status: Arc<RwLock<Status>>,
     inbox: mpsc::Receiver<Message>,
-    topics: BTreeMap<String, Topic>,
     subscriptions: Arc<RwLock<Vec<Subscription>>>,
 }
 
@@ -97,7 +109,6 @@ impl MessageHandler {
         MessageHandler {
             status: Arc::new(RwLock::new(Status::Unstarted)),
             inbox,
-            topics: BTreeMap::new(),
             subscriptions,
         }
     }

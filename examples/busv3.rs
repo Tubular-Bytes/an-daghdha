@@ -14,7 +14,7 @@ async fn main() {
     let (broker, mut handler) = MessageBroker::new();
     
     // Subscribe to messages before starting the handler
-    let mut subscriber_foo = broker.subscribe("example").await.unwrap();
+    let (_, mut subscriber_foo) = broker.subscribe("example").await.unwrap();
     
     let task_handler = tokio::spawn(async move {
         handler.start().await;
@@ -23,18 +23,37 @@ async fn main() {
     tracing::info!("Messaging system started");
     let now = chrono::Utc::now().timestamp_millis() as u64;
 
+    let id = Uuid::new_v4();
     // Send some messages
     broker.send(Message {
-        id: Uuid::new_v4(),
+        id,
         body: MessageBody::Example { foo: "bar".into() },
         topic: Some("example".into()),
+        reply: Some(format!("reply-{}", id)),
         timestamp: now,
     }).await.unwrap();
 
+    let bbb = broker.clone();
+    let (reply_id, mut subscriber_reply) = broker.subscribe(format!("reply-{}", id).as_str()).await.unwrap();
+    let _reply_handler = tokio::spawn(async move {
+        while let Some(msg) = subscriber_reply.recv().await {
+            tracing::info!("Received reply message: {:?}", msg);
+        }
+        bbb.unsubscribe(reply_id).await.unwrap();
+    });
+
     // Start a task to handle subscription messages
+    let sub_broker = broker.clone();
     let _subscription_handler = tokio::spawn(async move {
         while let Some(msg) = subscriber_foo.recv().await {
             tracing::info!("Received subscribed message: {:?}", msg);
+            sub_broker.send(Message {
+                id: Uuid::new_v4(),
+                body: MessageBody::ExampleResponse { foo: "response".into() },
+                topic: msg.reply,
+                reply: None,
+                timestamp: chrono::Utc::now().timestamp_millis() as u64,
+            }).await.unwrap();
         }
     });
 
@@ -53,6 +72,7 @@ async fn main() {
         id: Uuid::new_v4(),
         body: MessageBody::Stop,
         topic: None,
+        reply: None,
         timestamp: now,
     }).await.unwrap();
 
