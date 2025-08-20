@@ -29,33 +29,43 @@ async fn main() {
         id,
         body: MessageBody::Example { foo: "bar".into() },
         topic: Some("example".into()),
-        reply: Some(format!("reply-{}", id)),
+        is_request: false,
         timestamp: now,
     }).await.unwrap();
 
-    let bbb = broker.clone();
-    let (reply_id, mut subscriber_reply) = broker.subscribe(format!("reply-{}", id).as_str()).await.unwrap();
-    let _reply_handler = tokio::spawn(async move {
-        while let Some(msg) = subscriber_reply.recv().await {
-            tracing::info!("Received reply message: {:?}", msg);
-        }
-        bbb.unsubscribe(reply_id).await.unwrap();
-    });
-
+    let subbroker = broker.clone();
     // Start a task to handle subscription messages
-    let sub_broker = broker.clone();
     let _subscription_handler = tokio::spawn(async move {
         while let Some(msg) = subscriber_foo.recv().await {
             tracing::info!("Received subscribed message: {:?}", msg);
-            sub_broker.send(Message {
+
+            if !msg.is_request {
+                continue;
+            }
+
+            let reply_topic = msg.reply_topic();
+            tracing::info!("Reply topic: {}", reply_topic);
+
+            subbroker.send(Message {
                 id: Uuid::new_v4(),
                 body: MessageBody::ExampleResponse { foo: "response".into() },
-                topic: msg.reply,
-                reply: None,
+                topic: Some(reply_topic.clone()),
+                is_request: false,
                 timestamp: chrono::Utc::now().timestamp_millis() as u64,
             }).await.unwrap();
+
         }
     });
+
+    let reply = broker.request(Message {
+        id: Uuid::new_v4(),
+        body: MessageBody::Example { foo: "baz".into() },
+        topic: Some("example".into()),
+        is_request: true,
+        timestamp: now,
+    }).await;
+
+    tracing::info!("reply to 'baz': {reply:?}");
 
     match signal::ctrl_c().await {
         Ok(()) => {
@@ -72,7 +82,7 @@ async fn main() {
         id: Uuid::new_v4(),
         body: MessageBody::Stop,
         topic: None,
-        reply: None,
+        is_request: false,
         timestamp: now,
     }).await.unwrap();
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use regex::Regex;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use uuid::Uuid;
 
 pub enum Status {
@@ -23,8 +23,14 @@ pub struct Message {
     pub id: Uuid,
     pub body: MessageBody,
     pub topic: Option<String>,
-    pub reply: Option<String>,
+    pub is_request: bool,
     pub timestamp: u64,
+}
+
+impl Message {
+    pub fn reply_topic(&self) -> String {
+        format!("reply-{}", self.id)
+    }
 }
 
 pub struct Topic {
@@ -77,6 +83,60 @@ impl MessageBroker {
     
     pub async fn send(&self, message: Message) -> Result<(), mpsc::error::SendError<Message>> {
         self.tx.send(message).await
+    }
+
+    pub async fn request(&self, message: Message) -> Result<Option<Message>, anyhow::Error> {
+        // if the message is not a request we should just send a fire and forget and return None as the result
+        if !message.is_request {
+            self.send(message).await?;
+            return Ok(None);
+        }
+
+        let reply_topic = message.reply_topic();
+        let (result_tx, result_rx) = oneshot::channel();
+        
+        let broker = self.clone();
+        
+        self.tx.send(message).await?;
+        tracing::debug!("message sent, spawning reply handler for topic: {}", reply_topic);
+        
+        tokio::spawn(async move {
+            let reply_result = async {
+                let (reply_id, mut subscriber_reply) = broker.subscribe(&reply_topic).await
+                    .map_err(|e| anyhow::format_err!("Failed to subscribe: {}", e))?;
+                
+                tracing::debug!("subscribed to topic: {}", reply_topic);
+                
+                let reply = tokio::time::timeout(
+                    std::time::Duration::from_secs(30), // 30 second timeout
+                    subscriber_reply.recv()
+                ).await;
+                
+                if let Err(e) = broker.unsubscribe(reply_id).await {
+                    tracing::warn!("Failed to unsubscribe: {}", e);
+                }
+                
+                match reply {
+                    Ok(Some(message)) => {
+                        tracing::debug!("received reply: {:?}", message);
+                        Ok(Some(message))
+                    }
+                    Ok(None) => {
+                        tracing::debug!("reply channel closed");
+                        Ok(None)
+                    }
+                    Err(_) => {
+                        tracing::warn!("timeout waiting for reply on topic: {}", reply_topic);
+                        Err(anyhow::format_err!("Timeout waiting for reply"))
+                    }
+                }
+            }.await;
+            
+            let _ = result_tx.send(reply_result);
+        });
+        
+        result_rx.await
+            .map_err(|e| anyhow::format_err!("Reply handler task failed: {}", e))?
     }
     
     pub async fn subscribe(&self, pattern: &str) -> Result<(Uuid, mpsc::Receiver<Message>), regex::Error> {
