@@ -52,6 +52,13 @@ impl Subscription {
     pub fn new(pattern: &str) -> Result<(Self, mpsc::Receiver<Message>), regex::Error> {
         let regex = Regex::new(pattern)?;
         let (tx, rx) = mpsc::channel(100);
-        Ok((Self { id: Uuid::new_v4(), pattern: regex, tx }, rx))
+        Ok((
+            Self {
+                id: Uuid::new_v4(),
+                pattern: regex,
+                tx,
+            },
+            rx,
+        ))
     }
 }

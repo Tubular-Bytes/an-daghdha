@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, RwLock};
 
-use super::model::{Message, Status, Subscription, MessageBody};
+use super::model::{Message, MessageBody, Status, Subscription};
 
 pub struct MessageHandler {
     status: Arc<RwLock<Status>>,
@@ -11,7 +11,11 @@ pub struct MessageHandler {
 }
 
 impl MessageHandler {
-    pub fn new(inbox: mpsc::Receiver<Message>, subscriptions: Arc<RwLock<Vec<Subscription>>>, status: Arc<RwLock<Status>>) -> Self {
+    pub fn new(
+        inbox: mpsc::Receiver<Message>,
+        subscriptions: Arc<RwLock<Vec<Subscription>>>,
+        status: Arc<RwLock<Status>>,
+    ) -> Self {
         MessageHandler {
             status,
             inbox,
@@ -25,9 +29,7 @@ impl MessageHandler {
             *status_guard = Status::Running;
         }
         while let Some(message) = self.inbox.recv().await {
-            if std::mem::discriminant(&message.body)
-                == std::mem::discriminant(&MessageBody::Stop)
-            {
+            if std::mem::discriminant(&message.body) == std::mem::discriminant(&MessageBody::Stop) {
                 tracing::info!("Received stop message, shutting down");
                 {
                     let mut status_guard = self.status.write().await;
@@ -46,7 +48,7 @@ impl MessageHandler {
 
     pub async fn handle_message(&mut self, message: Message) {
         tracing::info!("Handling message: {:?}", message);
-        
+
         // Forward message to all matching subscriptions
         if let Some(topic) = &message.topic {
             let subscriptions = self.subscriptions.read().await;

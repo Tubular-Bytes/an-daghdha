@@ -12,10 +12,7 @@ use tokio_tungstenite::tungstenite::{
     protocol::Message,
 };
 
-use crate::messaging::{
-    broker::MessageBroker,
-    model::Message as BusMessage, model::MessageBody
-};
+use crate::messaging::{broker::MessageBroker, model::Message as BusMessage, model::MessageBody};
 
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
@@ -87,7 +84,9 @@ impl Bouncer {
         tracing::debug!("parsed message: {msg:?}");
 
         let message = BusMessage::new(
-            MessageBody::Example { foo: msg.to_string() },
+            MessageBody::Example {
+                foo: msg.to_string(),
+            },
             None,
             true,
         );

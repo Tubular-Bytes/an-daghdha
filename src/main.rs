@@ -1,15 +1,12 @@
 use std::net::SocketAddr;
 
 use an_daghdha::messaging::{
-    broker::MessageBroker,
-    model::Message, model::MessageBody, model::Status,
+    broker::MessageBroker, model::Message, model::MessageBody, model::Status,
 };
 use tokio::net::TcpListener;
 use tokio::signal;
-use tracing_subscriber;
 
 use an_daghdha::websocket;
-use an_daghdha::messaging;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -52,7 +49,10 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Send stop signal to the bus
-    if let Err(e) = broker.send(Message::new(MessageBody::Stop, None, false)).await {
+    if let Err(e) = broker
+        .send(Message::new(MessageBody::Stop, None, false))
+        .await
+    {
         tracing::error!("Failed to send stop signal to bus: {}", e);
     }
 
@@ -73,6 +73,6 @@ async fn main() -> Result<(), anyhow::Error> {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
-    let _ = task_handler.await?;
+    task_handler.await?;
     Ok(())
 }
