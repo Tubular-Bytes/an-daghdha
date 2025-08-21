@@ -1,0 +1,76 @@
+* Message bus planning
+
+Topics are logical separation between messages, it uses the same broadcast channel, topic is encapsulated in the message, actors decide what they process.
+This way actors can listen to topics by a wildcard and then use match statements to filter the selected tasks.
+
+Message types depending on communication participants:
+
+- Application -> All
+  shutdown
+- API -> Actors
+  auth, task
+- Ticker -> Actors
+  tick
+
+* Actor types
+
+Authx - responsible for authorization and authentication - direct database access
+Storage - responsible for distributing IO for the database - direct database access
+Inventory - represents a single account, keeps track of assets - database access through Storage actor
+
+** Authentication and authorization
+
+- Authn: API receives an authn message, dispatches a task to the auth actor and waits for the answer or timeout.
+  Task should include username, password and the reply channel.
+- Authz: API receives any operations other than authn with an =Authorization= header, dispatches a task with the token for validation and waits for the answer or timeout.
+  Task should include PASETO token and the reply channel.
+
+** Storage
+
+Inventory actors are responsible for persisting and caching data but these operations happen through the Storage actor. This actor listens for the usual CRUD operations and perform the tasks asynchronously. They emit two replies: one is instant, acknowledging the operation or returning possible validation errors, the other is sent via the reply channel if it's included in the task. This reply is optional for most operations except =read=: this operation requires the reply channel to send the requested value.
+
+** Inventory
+
+These actors manipulate the database via the storage layer to indicate state changes for assets they manage: resources, buildings, etc...
+
+* Message types
+
+Different message types are wrapped inside a Message enum for versatility and ease of use. The embedded types can take whatever form it requires to convey values over the bus.
+
+** shutdown
+#+begin_src
+struct Shutdown {}
+#+end_src
+
+** authentication
+#+begin_src
+struct Authentication {
+        username: String,
+        password: String,
+        reply: tokio::sync::oneshot::Sender<AuthenticationResponse>
+}
+#+end_src
+
+** authorization
+#+begin_src
+struct Authorization {
+        token: String,
+        reply: tokio::sync::oneshot::Sender<AuthorizationResponse>
+}
+#+end_src
+
+** tick
+#+begin_src
+struct Tick {}
+#+end_src
+
+** task
+Tasks will be a special kind of structure because it will contain an embedded type as tasks can be different kinds with different attributes.
+
+#+begin_src
+enum Task {
+        Build(inventory_id, blueprint_id),
+        Train(inventory_id, formula_id),
+        Produce(inventory_id, recipe_id),
+}
+#+end_src

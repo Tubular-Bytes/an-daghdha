@@ -1,5 +1,5 @@
-use tokio_tungstenite::tungstenite;
 use std::fmt::Display;
+use tokio_tungstenite::tungstenite;
 
 #[derive(Debug)]
 pub enum ApiError {
