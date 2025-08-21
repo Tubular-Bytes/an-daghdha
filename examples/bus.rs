@@ -1,4 +1,4 @@
-use an_daghdha::messaging::{Message, MessageBody, MessageBroker};
+use an_daghdha::messaging::{model::{Message, MessageBody}, broker::MessageBroker};
 use tokio::signal;
 use uuid::Uuid;
 

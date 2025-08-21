@@ -12,7 +12,10 @@ use tokio_tungstenite::tungstenite::{
     protocol::Message,
 };
 
-use crate::bus::model::Message as BusMessage;
+use crate::messaging::{
+    broker::MessageBroker,
+    model::Message as BusMessage, model::MessageBody
+};
 
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
@@ -20,14 +23,14 @@ type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
 #[derive(Clone)]
 pub struct Bouncer {
     peers: PeerMap,
-    bus_tx: tokio::sync::broadcast::Sender<BusMessage>,
+    broker: MessageBroker,
 }
 
 impl Bouncer {
-    pub fn new(bus_tx: tokio::sync::broadcast::Sender<BusMessage>) -> Self {
+    pub fn new(broker: &MessageBroker) -> Self {
         Bouncer {
             peers: Arc::new(Mutex::new(HashMap::new())),
-            bus_tx,
+            broker: broker.clone(),
         }
     }
 
@@ -83,7 +86,13 @@ impl Bouncer {
             .map_err(|e| anyhow::anyhow!("Failed to parse message: {}", e))?;
         tracing::debug!("parsed message: {msg:?}");
 
-        if let Err(e) = self.bus_tx.send(BusMessage::Example(msg.to_string())) {
+        let message = BusMessage::new(
+            MessageBody::Example { foo: msg.to_string() },
+            None,
+            true,
+        );
+
+        if let Err(e) = self.broker.send(message).await {
             tracing::error!("Error sending message to bus: {}", e);
         }
 

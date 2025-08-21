@@ -1,12 +1,15 @@
 use std::net::SocketAddr;
 
-use an_daghdha::bus::model::Message;
+use an_daghdha::messaging::{
+    broker::MessageBroker,
+    model::Message, model::MessageBody, model::Status,
+};
 use tokio::net::TcpListener;
 use tokio::signal;
 use tracing_subscriber;
 
-use an_daghdha::bus;
 use an_daghdha::websocket;
+use an_daghdha::messaging;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -16,12 +19,14 @@ async fn main() -> Result<(), anyhow::Error> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let (mut broker, bus_tx) = bus::Broker::new();
+    let (broker, mut handler) = MessageBroker::new();
 
-    broker.start().await;
+    let task_handler = tokio::spawn(async move {
+        handler.start().await;
+    });
 
     let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    let bouncer = websocket::Bouncer::new(bus_tx.clone());
+    let bouncer = websocket::Bouncer::new(&broker);
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;
@@ -47,14 +52,14 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Send stop signal to the bus
-    if let Err(e) = bus_tx.send(Message::Shutdown) {
+    if let Err(e) = broker.send(Message::new(MessageBody::Stop, None, false)).await {
         tracing::error!("Failed to send stop signal to bus: {}", e);
     }
 
     let mut grace_wait = 5;
     loop {
-        let status = broker.status().unwrap();
-        if status == bus::Status::Stopped {
+        let status = broker.status().await;
+        if status == Status::Stopped {
             break;
         }
 
@@ -68,5 +73,6 @@ async fn main() -> Result<(), anyhow::Error> {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
+    let _ = task_handler.await?;
     Ok(())
 }
