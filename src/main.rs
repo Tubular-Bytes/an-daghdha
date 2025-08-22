@@ -6,7 +6,7 @@ use an_daghdha::messaging::{
 use tokio::net::TcpListener;
 use tokio::signal;
 
-use an_daghdha::websocket;
+use an_daghdha::websocket::api;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -23,7 +23,14 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    let bouncer = websocket::Bouncer::new(&broker);
+    let bouncer = api::Bouncer::new(&broker);
+
+
+    let auth_actor = an_daghdha::actor::auth::AuthActorHandler::load("users.json".into())?;
+    let auth_broker = broker.clone();
+    tokio::spawn(async move {
+        auth_actor.listen(auth_broker).await.unwrap();
+    });
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;
