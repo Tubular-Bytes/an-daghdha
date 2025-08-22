@@ -13,9 +13,6 @@ pub enum Status {
 
 #[derive(Debug, Clone)]
 pub enum MessageBody {
-    Example { name: String },
-    ExampleResponse { name: String },
-
     AuthenticationRequest { user: String, password: String },
     AuthenticationResponse(Result<String, String>),
 
@@ -31,13 +28,6 @@ impl MessageBody {
             .ok_or_else(|| anyhow::anyhow!("Missing 'kind' field in message body"))?;
 
         match kind {
-            "example" => {
-                let name = value
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                Ok(Self::Example { name: name.into() })
-            }
             "authentication" => {
                 tracing::debug!("Parsing authentication request: {value:?}");
 

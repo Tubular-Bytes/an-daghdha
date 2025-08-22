@@ -118,6 +118,7 @@ impl Bouncer {
                     }
                 }
             }
+            
             _ => {
                 tracing::warn!("unexpected message body: {:?}", message_body);
                 Err(anyhow::anyhow!("unexpected message body"))
