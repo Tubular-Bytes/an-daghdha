@@ -67,9 +67,12 @@ impl Bouncer {
                     match response {
                         Ok(resp) => {
                             tracing::debug!("Sending response: {:?}", resp);
-                            write.send(Message::text(format!("Response: {:?}", resp))).await.unwrap_or_else(|e| {
-                                tracing::error!("Failed to send response: {}", e);
-                            });
+                            write
+                                .send(Message::text(format!("Response: {:?}", resp)))
+                                .await
+                                .unwrap_or_else(|e| {
+                                    tracing::error!("Failed to send response: {}", e);
+                                });
                         }
                         Err(e) => {
                             tracing::error!("Error handling message: {}", e);
@@ -107,17 +110,17 @@ impl Bouncer {
                 match self.broker.request(message).await {
                     Ok(response) => {
                         tracing::debug!("Received response from auth actor: {:?}", response);
-                        return Ok(response.unwrap());
+                        Ok(response.unwrap())
                     }
                     Err(e) => {
                         tracing::error!("Error sending message to bus: {}", e);
-                        return Err(anyhow::anyhow!("Error sending message to bus: {}", e));
+                        Err(anyhow::anyhow!("Error sending message to bus: {}", e))
                     }
                 }
             }
             _ => {
                 tracing::warn!("unexpected message body: {:?}", message_body);
-                return Err(anyhow::anyhow!("unexpected message body"));
+                Err(anyhow::anyhow!("unexpected message body"))
             }
         }
     }

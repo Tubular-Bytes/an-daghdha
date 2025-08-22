@@ -1,10 +1,13 @@
 use std::{collections::HashMap, fs, sync::Arc};
 use tokio::sync::RwLock;
 
-use uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use crate::messaging::{broker::MessageBroker, model::{Message, MessageBody}};
+use crate::messaging::{
+    broker::MessageBroker,
+    model::{Message, MessageBody},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -51,12 +54,14 @@ impl AuthActorHandler {
             match msg.body {
                 MessageBody::AuthenticationRequest { user, password } => {
                     let db = self.db.read().await;
-                    let response = if let Some(user) = db.values().find(|u| u.username == user && u.password == password) {
-                        let token = crate::auth::token::generate_token(user)
-                            .map_err(|e| {
-                                tracing::error!("Failed to generate token: {}", e);
-                                anyhow::format_err!("Token generation failed")
-                            })?;
+                    let response = if let Some(user) = db
+                        .values()
+                        .find(|u| u.username == user && u.password == password)
+                    {
+                        let token = crate::auth::token::generate_token(user).map_err(|e| {
+                            tracing::error!("Failed to generate token: {}", e);
+                            anyhow::format_err!("Token generation failed")
+                        })?;
                         tracing::info!("Authentication successful for user: {}", user.username);
                         Ok(token)
                     } else {
@@ -64,13 +69,15 @@ impl AuthActorHandler {
                         Err("Authentication failed".into())
                     };
 
-                    subbroker.send(Message {
-                        id: Uuid::new_v4(),
-                        body: MessageBody::AuthenticationResponse(response),
-                        topic: Some(reply_topic),
-                        is_request: false,
-                        timestamp: chrono::Utc::now().timestamp_millis() as u64,
-                    }).await?;
+                    subbroker
+                        .send(Message {
+                            id: Uuid::new_v4(),
+                            body: MessageBody::AuthenticationResponse(response),
+                            topic: Some(reply_topic),
+                            is_request: false,
+                            timestamp: chrono::Utc::now().timestamp_millis() as u64,
+                        })
+                        .await?;
                 }
                 _ => tracing::warn!("Unexpected message body: {:?}", msg.body),
             }

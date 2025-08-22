@@ -25,7 +25,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     let bouncer = api::Bouncer::new(&broker);
 
-
     let auth_actor = an_daghdha::actor::auth::AuthActorHandler::load("users.json".into())?;
     let auth_broker = broker.clone();
     tokio::spawn(async move {

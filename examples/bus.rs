@@ -31,7 +31,7 @@ async fn main() {
     broker
         .send(Message {
             id,
-            body: MessageBody::Example { foo: "bar".into() },
+            body: MessageBody::Example { name: "bar".into() },
             topic: Some("example".into()),
             is_request: false,
             timestamp: now,
@@ -56,7 +56,7 @@ async fn main() {
                 .send(Message {
                     id: Uuid::new_v4(),
                     body: MessageBody::ExampleResponse {
-                        foo: "response".into(),
+                        name: "response".into(),
                     },
                     topic: Some(reply_topic.clone()),
                     is_request: false,
@@ -70,7 +70,7 @@ async fn main() {
     let reply = broker
         .request(Message {
             id: Uuid::new_v4(),
-            body: MessageBody::Example { foo: "baz".into() },
+            body: MessageBody::Example { name: "baz".into() },
             topic: Some("example".into()),
             is_request: true,
             timestamp: now,

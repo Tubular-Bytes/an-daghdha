@@ -13,13 +13,10 @@ pub enum Status {
 
 #[derive(Debug, Clone)]
 pub enum MessageBody {
-    Example { foo: String },
-    ExampleResponse { foo: String },
+    Example { name: String },
+    ExampleResponse { name: String },
 
-    AuthenticationRequest {
-        user: String,
-        password: String,
-    },
+    AuthenticationRequest { user: String, password: String },
     AuthenticationResponse(Result<String, String>),
 
     Stop,
@@ -28,25 +25,38 @@ pub enum MessageBody {
 
 impl MessageBody {
     pub fn from_value(value: &Value) -> Result<Self, anyhow::Error> {
-        let kind = value.get("kind").and_then(Value::as_str).ok_or_else(|| {
-            anyhow::anyhow!("Missing 'kind' field in message body")
-        })?;
+        let kind = value
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("Missing 'kind' field in message body"))?;
 
         match kind {
             "example" => {
-                let foo = value.get("foo").and_then(Value::as_str).unwrap_or_default();
-                Ok(Self::Example { foo: foo.into() })
+                let name = value
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                Ok(Self::Example { name: name.into() })
             }
             "authentication" => {
                 tracing::debug!("Parsing authentication request: {value:?}");
 
-                let body = value.get("body").and_then(Value::as_object).ok_or_else(|| {
-                    anyhow::anyhow!("Missing 'body' field in authentication message")
-                })?;
+                let body = value
+                    .get("body")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'body' field in authentication message")
+                    })?;
 
                 let user = body.get("user").and_then(Value::as_str).unwrap_or_default();
-                let password = body.get("password").and_then(Value::as_str).unwrap_or_default();
-                Ok(Self::AuthenticationRequest { user: user.into(), password: password.into() })
+                let password = body
+                    .get("password")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                Ok(Self::AuthenticationRequest {
+                    user: user.into(),
+                    password: password.into(),
+                })
             }
             _ => Err(anyhow::anyhow!("Unknown message body kind: {}", kind)),
         }
