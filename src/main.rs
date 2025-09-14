@@ -26,10 +26,22 @@ async fn main() -> Result<(), anyhow::Error> {
     let bouncer = api::Bouncer::new(&broker);
 
     let auth_actor = an_daghdha::actor::auth::AuthActorHandler::load("users.json".into())?;
+    let inventory_ids = auth_actor.get_inventory_ids().await;
+
     let auth_broker = broker.clone();
     tokio::spawn(async move {
         auth_actor.listen(auth_broker).await.unwrap();
     });
+
+    // todo graceful shutdown for inventory actors
+    for inventory_id in inventory_ids {
+        let inventory_actor =
+            an_daghdha::actor::inventory::InventoryActorHandler { id: inventory_id };
+        let inventory_broker = broker.clone();
+        tokio::spawn(async move {
+            inventory_actor.listen(inventory_broker).await.unwrap();
+        });
+    }
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;

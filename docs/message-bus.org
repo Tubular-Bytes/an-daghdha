@@ -35,7 +35,21 @@ These actors manipulate the database via the storage layer to indicate state cha
 
 * Message types
 
+** There would be two different kinds of messages and their response counterparts, depending on which layer boundaries they're crossing:
+
+1. API messages: these messages are sent from the API layer to the broker, requesting a specific action to be performed. They are much simpler than the second kind as the client is agnostic to internals, they only need to know what action they want to perform and the necessary parameters.
+
+2. Task messages: these messages are sent from the broker to the actors, requesting them to perform a specific action. These messages are more complex as they don't only include the action but the necessary context and data for the actor to execute the task.
+
+API messages are always handled as request-response types: the broker has to reply once the task has been sent for processing, then possibly again when the task is complete.
+
+Task messages can be fire and forget, they can just indicate a task has to be done but their result is not important for the caller. Possible issues and errors will be logged and wired to trigger alerts so operators can take action if needed.
+
 Different message types are wrapped inside a Message enum for versatility and ease of use. The embedded types can take whatever form it requires to convey values over the bus.
+
+*** API messages
+
+
 
 ** shutdown
 #+begin_src

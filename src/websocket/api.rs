@@ -9,6 +9,7 @@ use std::{
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
     handshake::server::{Request, Response},
+    http,
     protocol::Message,
 };
 
@@ -38,9 +39,14 @@ impl Bouncer {
     pub async fn handle_connection(self, addr: SocketAddr, stream: TcpStream) {
         tracing::debug!("handling incoming connection: {:?}", addr);
 
+        let mut used_headers = http::HeaderMap::new();
+
         let callback = |req: &Request, response: Response| {
             let headers = req.headers();
             tracing::debug!("got auth header: {:?}", headers.get("Authorization"));
+            if let Some(auth_header) = headers.get("Authorization") {
+                used_headers.insert("Authorization", auth_header.clone());
+            }
 
             Ok(response)
         };
@@ -63,7 +69,7 @@ impl Bouncer {
                         tracing::warn!("Received non-text message: {:?}", msg);
                         continue;
                     }
-                    let response = self.handle_message(msg.clone()).await;
+                    let response = self.handle_message(&mut used_headers, msg.clone()).await;
                     match response {
                         Ok(resp) => {
                             tracing::debug!("Sending response: {:?}", resp);
@@ -94,22 +100,27 @@ impl Bouncer {
         self.peers.lock().unwrap().remove(&addr);
     }
 
-    async fn handle_message(&self, message: Message) -> Result<BusMessage, anyhow::Error> {
-        tracing::debug!("raw message: {message:?}");
+    async fn handle_message(
+        &self,
+        headers: &mut http::HeaderMap,
+        message: Message,
+    ) -> Result<BusMessage, anyhow::Error> {
+        tracing::debug!("proxied headers: {headers:?}");
         let msg: Value = serde_json::from_str(message.to_text()?)
             .map_err(|e| anyhow::anyhow!("Failed to parse message: {}", e))?;
         tracing::debug!("parsed message: {msg:?}");
 
-        let message_body = MessageBody::from_value(&msg)?;
+        let mut message_body = MessageBody::from_value(&msg)?;
 
-        match &message_body {
+        match &mut message_body {
             MessageBody::AuthenticationRequest { .. } => {
                 tracing::debug!("forwarding auth request to auth actor");
                 let message = BusMessage::new(message_body, topic("auth"), true);
 
                 match self.broker.request(message).await {
                     Ok(response) => {
-                        tracing::debug!("Received response from auth actor: {:?}", response);
+                        tracing::debug!("Received response from auth actor: {response:?}");
+                        headers.insert("X-Logged-In", "true".parse().unwrap());
                         Ok(response.unwrap())
                     }
                     Err(e) => {
@@ -118,7 +129,36 @@ impl Bouncer {
                     }
                 }
             }
-            
+            MessageBody::BuildRequest {
+                inventory_id,
+                blueprint_id,
+            } => {
+                tracing::debug!("forwarding build request to build actor");
+                let mutated_body = MessageBody::BuildRequest {
+                    inventory_id: *inventory_id,
+                    blueprint_id: blueprint_id.clone(),
+                };
+                let message = BusMessage::new(
+                    mutated_body,
+                    topic(format!("inventory:{inventory_id}").as_str()),
+                    false,
+                );
+
+                let _ = self.broker.send(message).await;
+                Ok(EMPTY_MESSAGE.clone())
+
+                // match self.broker.request(message).await {
+                //     Ok(response) => {
+                //         tracing::debug!("Received response from build actor: {response:?}");
+                //         Ok(response.unwrap())
+                //     }
+                //     Err(e) => {
+                //         tracing::error!("Error sending message to bus: {}", e);
+                //         Err(anyhow::anyhow!("Error sending message to bus: {}", e))
+                //     }
+                // }
+            }
+
             _ => {
                 tracing::warn!("unexpected message body: {:?}", message_body);
                 Err(anyhow::anyhow!("unexpected message body"))

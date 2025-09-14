@@ -13,8 +13,17 @@ pub enum Status {
 
 #[derive(Debug, Clone)]
 pub enum MessageBody {
-    AuthenticationRequest { user: String, password: String },
+    AuthenticationRequest {
+        user: String,
+        password: String,
+    },
     AuthenticationResponse(Result<String, String>),
+
+    BuildRequest {
+        inventory_id: Uuid,
+        blueprint_id: String,
+    },
+    BuildResponse(Result<String, String>),
 
     Stop,
     Empty,
@@ -46,6 +55,32 @@ impl MessageBody {
                 Ok(Self::AuthenticationRequest {
                     user: user.into(),
                     password: password.into(),
+                })
+            }
+            "build" => {
+                tracing::debug!("Parsing build request: {value:?}");
+
+                let body = value
+                    .get("body")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'body' field in build message"))?;
+
+                let inventory_id = body
+                    .get("inventory_id")
+                    .and_then(Value::as_str)
+                    .and_then(|s| Uuid::parse_str(s).ok())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing or invalid 'inventory_id' in build message")
+                    })?;
+
+                let blueprint_id = body
+                    .get("blueprint_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+
+                Ok(Self::BuildRequest {
+                    inventory_id,
+                    blueprint_id: blueprint_id.into(),
                 })
             }
             _ => Err(anyhow::anyhow!("Unknown message body kind: {}", kind)),

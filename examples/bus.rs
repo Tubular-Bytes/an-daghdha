@@ -31,7 +31,10 @@ async fn main() {
     broker
         .send(Message {
             id,
-            body: MessageBody::AuthenticationRequest { user: "foo".into(), password: "bar".into() },
+            body: MessageBody::AuthenticationRequest {
+                user: "foo".into(),
+                password: "bar".into(),
+            },
             topic: Some("example".into()),
             is_request: false,
             timestamp: now,
@@ -68,7 +71,10 @@ async fn main() {
     let reply = broker
         .request(Message {
             id: Uuid::new_v4(),
-            body: MessageBody::AuthenticationRequest { user: "baz".into(), password: "qux".into() },
+            body: MessageBody::AuthenticationRequest {
+                user: "baz".into(),
+                password: "qux".into(),
+            },
             topic: Some("example".into()),
             is_request: true,
             timestamp: now,

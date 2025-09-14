@@ -1,20 +1,12 @@
+use crate::actor::model::User;
 use std::{collections::HashMap, fs, sync::Arc};
 use tokio::sync::RwLock;
-
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::messaging::{
     broker::MessageBroker,
     model::{Message, MessageBody},
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
-    pub id: Uuid,
-    pub username: String,
-    pub password: String, // In a real application, use hashed passwords
-}
 
 pub struct AuthActorHandler {
     pub id: Uuid,
@@ -35,6 +27,11 @@ impl AuthActorHandler {
             id: Uuid::new_v4(),
             db,
         })
+    }
+
+    pub async fn get_inventory_ids(&self) -> Vec<Uuid> {
+        let db = self.db.read().await;
+        db.values().map(|u| u.id).collect()
     }
 
     pub async fn listen(&self, broker: MessageBroker) -> Result<(), anyhow::Error> {

@@ -1,3 +1,4 @@
+use crate::actor::model::User;
 use rusty_paseto::{
     core::{Key, Local, PasetoSymmetricKey, V4},
     prelude::{ExpirationClaim, PasetoBuilder, PasetoParser, SubjectClaim},
@@ -6,8 +7,6 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 static PASETO_KEY: &str = "your-secret-key";
-
-use crate::actor::auth::User;
 
 pub fn generate_token(user: &User) -> Result<String, anyhow::Error> {
     let expiration = chrono::Utc::now() + chrono::Duration::days(2);
