@@ -38,6 +38,17 @@ pub fn validate_token(token: &str) -> Result<Uuid, anyhow::Error> {
     )?)?)
 }
 
+pub fn validate_headers(headers: &axum::http::HeaderMap) -> Result<Uuid, anyhow::Error> {
+    if let Some(auth_header) = headers.get("Authorization") {
+        let auth_str = auth_header.to_str()?;
+        if auth_str.starts_with("Bearer ") {
+            let token = auth_str.trim_start_matches("Bearer ").trim();
+            return validate_token(token);
+        }
+    }
+    Err(anyhow::anyhow!("Missing or invalid Authorization header"))
+}
+
 #[cfg(test)]
 mod tests {
     use uuid::Uuid;

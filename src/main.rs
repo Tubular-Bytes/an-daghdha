@@ -1,11 +1,17 @@
-use std::net::SocketAddr;
-
 use an_daghdha::messaging::{
-    broker::MessageBroker, model::Message, model::MessageBody, model::Status,
+    broker::MessageBroker, model::Message as InternalMessage, model::MessageBody, model::Status,
 };
-use tokio::net::TcpListener;
+use an_daghdha::{auth, AppState};
+use axum::extract::ws::Message;
+use axum::extract::{ws::WebSocket, State, WebSocketUpgrade};
+use axum::http::HeaderMap;
+use axum::response::Response;
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use serde_json::json;
 use tokio::signal;
 
+use an_daghdha::auth::token;
 use an_daghdha::websocket::api;
 
 #[tokio::main]
@@ -22,7 +28,6 @@ async fn main() -> Result<(), anyhow::Error> {
         handler.start().await;
     });
 
-    let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
     let bouncer = api::Bouncer::new(&broker);
 
     let auth_actor = an_daghdha::actor::auth::AuthActorHandler::load("users.json".into())?;
@@ -43,17 +48,19 @@ async fn main() -> Result<(), anyhow::Error> {
         });
     }
 
-    // Create the event loop and TCP listener we'll accept connections on.
-    let try_socket = TcpListener::bind(&addr).await;
-    let listener = try_socket.expect("Failed to bind");
-    tracing::info!("Listening on: {}", addr);
+    let state = (bouncer, broker.clone()).into();
 
-    // Let's spawn the handling of each connection in a separate task.
-    tokio::spawn(async move {
-        while let Ok((stream, addr)) = listener.accept().await {
-            tokio::spawn(bouncer.clone().handle_connection(addr, stream));
-        }
-    });
+    let app = Router::new()
+        .route("/health", get(|| async { Json(json!({ "status": "ok" })) }))
+        .route("/auth/login", post(auth::handler::handle_login))
+        .route("/rtc", get(ws_handler))
+        .with_state(state);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
+    println!("listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap();
 
     // Wait for Ctrl+C signal
     match signal::ctrl_c().await {
@@ -68,7 +75,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Send stop signal to the bus
     if let Err(e) = broker
-        .send(Message::new(MessageBody::Stop, None, false))
+        .send(InternalMessage::new(MessageBody::Stop, None, false))
         .await
     {
         tracing::error!("Failed to send stop signal to bus: {}", e);
@@ -93,4 +100,31 @@ async fn main() -> Result<(), anyhow::Error> {
 
     task_handler.await?;
     Ok(())
+}
+
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    headers: HeaderMap,
+    State(state): State<AppState>,
+) -> Response {
+    ws.on_upgrade(move |socket| handle_socket(socket, headers, state))
+}
+
+async fn handle_socket(mut ws: WebSocket, headers: HeaderMap, state: AppState) {
+    tracing::info!("New WebSocket connection with headers {:?}", headers);
+
+    let user_id = match token::validate_headers(&headers) {
+        Ok(uid) => uid,
+        Err(e) => {
+            tracing::error!("Failed to validate headers: {}", e);
+            ws.send(Message::Text("Unauthorized".into()))
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!("Failed to send unauthorized message: {}", e);
+                });
+            return;
+        }
+    };
+
+    state.bouncer.handle_connection(user_id, ws).await;
 }

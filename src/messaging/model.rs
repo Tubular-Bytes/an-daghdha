@@ -1,4 +1,5 @@
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -11,7 +12,7 @@ pub enum Status {
     Stopped,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageBody {
     AuthenticationRequest {
         user: String,
@@ -24,6 +25,8 @@ pub enum MessageBody {
         blueprint_id: String,
     },
     BuildResponse(Result<String, String>),
+
+    DebugMessage(String),
 
     Stop,
     Empty,
@@ -88,7 +91,7 @@ impl MessageBody {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub id: Uuid,
     pub body: MessageBody,
