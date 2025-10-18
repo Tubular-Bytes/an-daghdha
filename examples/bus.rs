@@ -31,7 +31,10 @@ async fn main() {
     broker
         .send(Message {
             id,
-            body: MessageBody::Example { foo: "bar".into() },
+            body: MessageBody::AuthenticationRequest {
+                user: "foo".into(),
+                password: "bar".into(),
+            },
             topic: Some("example".into()),
             is_request: false,
             timestamp: now,
@@ -55,9 +58,7 @@ async fn main() {
             subbroker
                 .send(Message {
                     id: Uuid::new_v4(),
-                    body: MessageBody::ExampleResponse {
-                        foo: "response".into(),
-                    },
+                    body: MessageBody::AuthenticationResponse(Ok("response to foo".into())),
                     topic: Some(reply_topic.clone()),
                     is_request: false,
                     timestamp: chrono::Utc::now().timestamp_millis() as u64,
@@ -70,7 +71,10 @@ async fn main() {
     let reply = broker
         .request(Message {
             id: Uuid::new_v4(),
-            body: MessageBody::Example { foo: "baz".into() },
+            body: MessageBody::AuthenticationRequest {
+                user: "baz".into(),
+                password: "qux".into(),
+            },
             topic: Some("example".into()),
             is_request: true,
             timestamp: now,

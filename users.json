@@ -1,0 +1,12 @@
+{
+    "urn:uuid:b7e2c6c2-4a3e-4d7a-9b8d-2c9f1e3a7f5a": {
+        "id": "urn:uuid:b7e2c6c2-4a3e-4d7a-9b8d-2c9f1e3a7f5a",
+        "username": "user1",
+        "password": "pass1"
+    },
+    "urn:uuid:c3f1e2d4-5a6b-7c8d-9e0f-1a2b3c4d5e6f": {
+        "id": "urn:uuid:c3f1e2d4-5a6b-7c8d-9e0f-1a2b3c4d5e6f",
+        "username": "user2",
+        "password": "pass2"
+    }
+}

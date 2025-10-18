@@ -1,4 +1,6 @@
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -10,14 +12,86 @@ pub enum Status {
     Stopped,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageBody {
-    Example { foo: String },
-    ExampleResponse { foo: String },
+    AuthenticationRequest {
+        user: String,
+        password: String,
+    },
+    AuthenticationResponse(Result<String, String>),
+
+    BuildRequest {
+        inventory_id: Uuid,
+        blueprint_id: String,
+    },
+    BuildResponse(Result<String, String>),
+
+    DebugMessage(String),
+
     Stop,
+    Empty,
 }
 
-#[derive(Debug, Clone)]
+impl MessageBody {
+    pub fn from_value(value: &Value) -> Result<Self, anyhow::Error> {
+        let kind = value
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("Missing 'kind' field in message body"))?;
+
+        match kind {
+            "authentication" => {
+                tracing::debug!("Parsing authentication request: {value:?}");
+
+                let body = value
+                    .get("body")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'body' field in authentication message")
+                    })?;
+
+                let user = body.get("user").and_then(Value::as_str).unwrap_or_default();
+                let password = body
+                    .get("password")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                Ok(Self::AuthenticationRequest {
+                    user: user.into(),
+                    password: password.into(),
+                })
+            }
+            "build" => {
+                tracing::debug!("Parsing build request: {value:?}");
+
+                let body = value
+                    .get("body")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'body' field in build message"))?;
+
+                let inventory_id = body
+                    .get("inventory_id")
+                    .and_then(Value::as_str)
+                    .and_then(|s| Uuid::parse_str(s).ok())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing or invalid 'inventory_id' in build message")
+                    })?;
+
+                let blueprint_id = body
+                    .get("blueprint_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+
+                Ok(Self::BuildRequest {
+                    inventory_id,
+                    blueprint_id: blueprint_id.into(),
+                })
+            }
+            _ => Err(anyhow::anyhow!("Unknown message body kind: {}", kind)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub id: Uuid,
     pub body: MessageBody,

@@ -5,16 +5,23 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.99"
-chrono = "0.4.41"
-diesel = { version = "2.2.12", features = ["postgres"] }
+chrono = "0.4.42"
+diesel = { version = "2.3.1", features = ["postgres"] }
 dotenvy = "0.15"
 futures-channel = "0.3.31"
 futures-util = "0.3.31"
-regex = "1.11.1"
-serde = "1.0.219"
-serde_json = "1.0.142"
+lazy_static = "1.5.0"
+regex = "1.11.2"
+rusty_paseto = "0.7.2"
+serde = { version = "1.0.221", features = ["derive"] }
+serde_json = "1.0.145"
+sha2 = "0.10.9"
 tokio = { version = "1.47.1", features = ["full"] }
 tokio-tungstenite = "0.27.0"
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-uuid = { version = "1.18.0", features = ["v4"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+uuid = { version = "1.18.1", features = ["v4", "serde"] }
+axum = { version = "0.8.4", features = ["json", "ws"] }
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
+tokio-stream = { version = "0.1.17", features = ["sync"] }
+futures = "0.3.31"
