@@ -9,11 +9,17 @@ pub async fn handle_login(
 ) -> Json<serde_json::Value> {
     tracing::info!("Login attempt for user: {}", payload.user);
 
-    let user = state.broker.request(Message::new(
-        crate::messaging::model::MessageBody::AuthenticationRequest { user: payload.user, password: payload.password },
-        Some("auth".to_string()),
-        true,
-    )).await;
+    let user = state
+        .broker
+        .request(Message::new(
+            crate::messaging::model::MessageBody::AuthenticationRequest {
+                user: payload.user,
+                password: payload.password,
+            },
+            Some("auth".to_string()),
+            true,
+        ))
+        .await;
 
     match user {
         Ok(response) => {
