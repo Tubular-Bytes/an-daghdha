@@ -53,20 +53,15 @@ impl MessageBroker {
 
         let broker = self.clone();
 
-        self.tx.send(message).await?;
-        tracing::debug!(
-            "message sent, spawning reply handler for topic: {}",
-            reply_topic
-        );
-
+        let topic = reply_topic.clone();
         tokio::spawn(async move {
             let reply_result = async {
                 let (reply_id, mut subscriber_reply) = broker
-                    .subscribe(&reply_topic)
+                    .subscribe(topic.as_str())
                     .await
                     .map_err(|e| anyhow::format_err!("Failed to subscribe: {}", e))?;
 
-                tracing::debug!("subscribed to topic: {}", reply_topic);
+                tracing::debug!("subscribed to topic: {}", topic);
 
                 let reply = tokio::time::timeout(
                     std::time::Duration::from_secs(30), // 30 second timeout
@@ -88,7 +83,7 @@ impl MessageBroker {
                         Ok(None)
                     }
                     Err(_) => {
-                        tracing::warn!("timeout waiting for reply on topic: {}", reply_topic);
+                        tracing::warn!("timeout waiting for reply on topic: {}", topic);
                         Err(anyhow::format_err!("Timeout waiting for reply"))
                     }
                 }
@@ -97,6 +92,12 @@ impl MessageBroker {
 
             let _ = result_tx.send(reply_result);
         });
+
+        self.tx.send(message).await?;
+        tracing::debug!(
+            "message sent, spawning reply handler for topic: {}",
+            reply_topic
+        );
 
         result_rx
             .await
