@@ -34,31 +34,36 @@ impl PersistenceHandler {
 
             while let Some(msg) = rx.recv().await {
                 tracing::info!("Persistence handler received message: {:?}", msg);
+                let reply_topic = msg.reply_topic();
 
-                if msg.is_request {
-                    let reply = Message {
-                        id: Uuid::new_v4(),
-                        body: MessageBody::PersistenceQueryResponse(vec![]),
-                        topic: Some(msg.reply_topic()),
-                        is_request: false,
-                        timestamp: chrono::Utc::now().timestamp_millis() as u64,
-                    };
+                match msg.body {
+                    MessageBody::PersistenceQuery(query) => {
+                        tracing::info!("Querying persistence data with query: {:?}", query);
 
-                    if let Err(e) = broker.send(reply).await {
-                        tracing::error!(
-                            error = e.to_string(),
-                            "Failed to send persistence query response"
+                        if msg.is_request {
+                            let reply = Message {
+                                id: Uuid::new_v4(),
+                                body: MessageBody::PersistenceQueryResponse(vec![]),
+                                topic: Some(reply_topic),
+                                is_request: false,
+                                timestamp: chrono::Utc::now().timestamp_millis() as u64,
+                            };
+
+                            if let Err(e) = broker.send(reply).await {
+                                tracing::error!(
+                                    error = e.to_string(),
+                                    "Failed to send persistence query response"
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        tracing::warn!(
+                            "Persistence handler received unexpected message body: {:?}",
+                            msg.body
                         );
                     }
                 }
-                // match msg.body {
-                //     _ => {
-                //         tracing::warn!(
-                //             "Persistence handler received unexpected message body: {:?}",
-                //             msg.body
-                //         );
-                //     }
-                // }
             }
         });
 
