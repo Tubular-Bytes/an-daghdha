@@ -30,6 +30,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let bouncer = api::Bouncer::new(&broker);
 
+    let persistence_handle = an_daghdha::persistence::PersistenceHandler::listen(&broker).await?;
+
     let auth_actor = an_daghdha::actor::auth::AuthActorHandler::load("users.json".into())?;
     let inventory_ids = auth_actor.get_inventory_ids().await;
 
@@ -99,6 +101,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     task_handler.await?;
+    persistence_handle.await?;
     Ok(())
 }
 

@@ -34,6 +34,32 @@ impl AuthActorHandler {
         db.values().map(|u| u.id).collect()
     }
 
+    async fn authenticate(
+        broker: &MessageBroker,
+        username: &String,
+        password: &String,
+    ) -> Result<(), anyhow::Error> {
+        let response = broker
+            .request(Message {
+                id: Uuid::new_v4(),
+                body: MessageBody::PersistenceQuery(format!(
+                    "SELECT * FROM users WHERE username='{}' AND password='{}'",
+                    username, password
+                )),
+                topic: Some("persistence".into()),
+                is_request: true,
+                timestamp: chrono::Utc::now().timestamp_millis() as u64,
+            })
+            .await?;
+
+        tracing::debug!(
+            response = format!("{response:?}"),
+            "received response from persistence layer"
+        );
+
+        Ok(())
+    }
+
     pub async fn listen(&self, broker: MessageBroker) -> Result<(), anyhow::Error> {
         let (sub_id, mut rx) = match broker.subscribe("auth").await {
             Ok(id) => id,
@@ -50,6 +76,8 @@ impl AuthActorHandler {
             let reply_topic = msg.reply_topic();
             match msg.body {
                 MessageBody::AuthenticationRequest { user, password } => {
+                    let _ = Self::authenticate(&broker, &user, &password).await;
+
                     let db = self.db.read().await;
                     let response = if let Some(user) = db
                         .values()

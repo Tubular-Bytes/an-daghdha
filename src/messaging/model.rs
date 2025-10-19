@@ -13,6 +13,12 @@ pub enum Status {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PersistenceRecord {
+    // Placeholder for actual record types
+    Dummy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageBody {
     AuthenticationRequest {
         user: String,
@@ -27,6 +33,9 @@ pub enum MessageBody {
     BuildResponse(Result<String, String>),
 
     DebugMessage(String),
+
+    PersistenceQuery(String),
+    PersistenceQueryResponse(Vec<PersistenceRecord>),
 
     Stop,
     Empty,
