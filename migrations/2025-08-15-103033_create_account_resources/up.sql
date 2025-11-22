@@ -1,7 +1,6 @@
--- Your SQL goes here
 CREATE TABLE IF NOT EXISTS account_resources (
-    id SERIAL PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     inventory JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

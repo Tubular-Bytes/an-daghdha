@@ -1,6 +1,8 @@
+use an_daghdha::actor::auth::AuthActorHandler;
 use an_daghdha::messaging::{
     broker::MessageBroker, model::Message as InternalMessage, model::MessageBody, model::Status,
 };
+use an_daghdha::persistence::HandlerStatus;
 use an_daghdha::{auth, AppState};
 use axum::extract::ws::Message;
 use axum::extract::{ws::WebSocket, State, WebSocketUpgrade};
@@ -8,6 +10,9 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use diesel::r2d2::ConnectionManager;
+use diesel::PgConnection;
+use r2d2::Pool;
 use serde_json::json;
 use tokio::signal;
 
@@ -30,15 +35,42 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let bouncer = api::Bouncer::new(&broker);
 
-    let persistence_handle = an_daghdha::persistence::PersistenceHandler::listen(&broker).await?;
+    let database_url = std::env::var("DATABASE_URL")
+        .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable not set"))?;
 
-    let auth_actor = an_daghdha::actor::auth::AuthActorHandler::load("users.json".into())?;
-    let inventory_ids = auth_actor.get_inventory_ids().await;
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = Pool::builder().build(manager)?;
+
+    let mut persistence_handler = an_daghdha::persistence::PersistenceHandler::new();
+    let persistence_handle = persistence_handler.listen(&broker, &pool).await?;
+
+    for i in 0..5 {
+        tracing::debug!("[{}/5]waiting for persistence handler to start listening...", i + 1);
+        match persistence_handler.status.read() {
+            Ok(s) => {
+                if *s == HandlerStatus::Listening {
+                    break;
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to read persistence handler status: {}", e);
+                continue;
+            }
+        };
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    let auth_actor = an_daghdha::actor::auth::AuthActorHandler::new();
 
     let auth_broker = broker.clone();
     tokio::spawn(async move {
         auth_actor.listen(auth_broker).await.unwrap();
     });
+
+    let inventory_ids = AuthActorHandler::get_inventory_ids(&broker).await;
+
+    tracing::info!("Starting inventory actors for IDs: {:?}", inventory_ids);
 
     // todo graceful shutdown for inventory actors
     for inventory_id in inventory_ids {
