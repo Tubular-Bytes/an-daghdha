@@ -95,7 +95,7 @@ impl MessageBroker {
             let _ = result_tx.send(reply_result);
         });
 
-        let msg_id = message.id.clone();
+        let msg_id = message.id;
         let topic = message.topic.clone();
 
         self.tx.send(message).await?;

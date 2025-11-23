@@ -10,6 +10,12 @@ pub struct AuthActorHandler {
     pub id: Uuid,
 }
 
+impl Default for AuthActorHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuthActorHandler {
     pub fn new() -> Self {
         AuthActorHandler { id: Uuid::new_v4() }

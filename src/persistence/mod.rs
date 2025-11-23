@@ -44,6 +44,12 @@ pub enum QueryResponse {
     GetInventoryIdsFailed(String),
 }
 
+impl Default for PersistenceHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PersistenceHandler {
     pub fn new() -> Self {
         Self {
@@ -165,29 +171,25 @@ impl PersistenceHandler {
             .await
             .unwrap_or(None);
 
-        let reply = match id {
-            None => Message {
-                id: Uuid::new_v4(),
-                body: MessageBody::PersistenceQueryResponse(QueryResponse::AuthFailed(
-                    "Authentication failed".into(),
-                )),
-                topic: Some(reply_topic),
-                is_request: false,
-                timestamp: chrono::Utc::now().timestamp_millis() as u64,
-            },
+        let reply: MessageBody = match id {
+            None => MessageBody::PersistenceQueryResponse(QueryResponse::AuthFailed(
+                "Authentication failed".into(),
+            )),
             Some(user_id) => {
                 tracing::info!("User authenticated with ID: {}", user_id);
-                let token = "".into();
-                Message {
-                    id: Uuid::new_v4(),
-                    body: MessageBody::PersistenceQueryResponse(QueryResponse::AuthSuccess(token)),
-                    topic: Some(reply_topic),
-                    is_request: false,
-                    timestamp: chrono::Utc::now().timestamp_millis() as u64,
+
+                match crate::auth::token::generate_token(&user_id.to_string()) {
+                    Ok(token) => {
+                        MessageBody::PersistenceQueryResponse(QueryResponse::AuthSuccess(token))
+                    }
+                    Err(e) => MessageBody::PersistenceQueryResponse(QueryResponse::AuthFailed(
+                        format!("Token generation failed: {}", e),
+                    )),
                 }
             }
         };
 
+        let reply = Message::new(reply, Some(reply_topic), false);
         if let Err(e) = broker.send(reply).await {
             tracing::error!(
                 error = e.to_string(),

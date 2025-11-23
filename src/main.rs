@@ -46,7 +46,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     for i in 0..5 {
         tracing::debug!(
-            "[{}/5]waiting for persistence handler to start listening...",
+            "[{}/5] waiting for persistence handler to start listening...",
             i + 1
         );
         match persistence_handler.status.read() {
@@ -96,7 +96,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
         .unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
+    tracing::info!(
+        address = format!("{}", listener.local_addr().unwrap()),
+        "http service listening"
+    );
     axum::serve(listener, app).await.unwrap();
 
     // Wait for Ctrl+C signal
