@@ -45,7 +45,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let persistence_handle = persistence_handler.listen(&broker, &pool).await?;
 
     for i in 0..5 {
-        tracing::debug!("[{}/5]waiting for persistence handler to start listening...", i + 1);
+        tracing::debug!(
+            "[{}/5]waiting for persistence handler to start listening...",
+            i + 1
+        );
         match persistence_handler.status.read() {
             Ok(s) => {
                 if *s == HandlerStatus::Listening {

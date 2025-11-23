@@ -46,7 +46,7 @@ pub enum QueryResponse {
 
 impl PersistenceHandler {
     pub fn new() -> Self {
-        Self{
+        Self {
             status: Arc::new(RwLock::new(HandlerStatus::Initialized)),
         }
     }
@@ -99,70 +99,17 @@ impl PersistenceHandler {
 
                         match query {
                             Query::GetInventoryIds => {
-                                tracing::debug!("received GetInventoryIds query");
-                                let reply_body =
-                                    match user_repository::get_inventory_ids(conn).await {
-                                        Ok(ids) => MessageBody::PersistenceQueryResponse(
-                                            QueryResponse::GetInventoryIds(ids),
-                                        ),
-                                        Err(e) => MessageBody::PersistenceQueryResponse(
-                                            QueryResponse::GetInventoryIdsFailed(e.to_string()),
-                                        ),
-                                    };
-
-                                let message = Message {
-                                    id: Uuid::new_v4(),
-                                    body: reply_body,
-                                    topic: Some(reply_topic),
-                                    is_request: false,
-                                    timestamp: chrono::Utc::now().timestamp_millis() as u64,
-                                };
-
-                                if let Err(e) = broker.send(message).await {
-                                    tracing::error!(
-                                        error = e.to_string(),
-                                        "Failed to send persistence query response"
-                                    );
-                                }
+                                PersistenceHandler::get_inventory_ids(conn, &broker, reply_topic)
+                                    .await;
                             }
                             Query::Auth { username, password } => {
-                                let id = user_repository::authenticate(conn, &username, &password)
-                                    .await
-                                    .unwrap_or(None);
-
-                                let reply = match id {
-                                    None => Message {
-                                        id: Uuid::new_v4(),
-                                        body: MessageBody::PersistenceQueryResponse(
-                                            QueryResponse::AuthFailed(
-                                                "Authentication failed".into(),
-                                            ),
-                                        ),
-                                        topic: Some(reply_topic),
-                                        is_request: false,
-                                        timestamp: chrono::Utc::now().timestamp_millis() as u64,
-                                    },
-                                    Some(user_id) => {
-                                        tracing::info!("User authenticated with ID: {}", user_id);
-                                        let token = "".into();
-                                        Message {
-                                            id: Uuid::new_v4(),
-                                            body: MessageBody::PersistenceQueryResponse(
-                                                QueryResponse::AuthSuccess(token),
-                                            ),
-                                            topic: Some(reply_topic),
-                                            is_request: false,
-                                            timestamp: chrono::Utc::now().timestamp_millis() as u64,
-                                        }
-                                    }
-                                };
-
-                                if let Err(e) = broker.send(reply).await {
-                                    tracing::error!(
-                                        error = e.to_string(),
-                                        "Failed to send persistence query response"
-                                    );
-                                }
+                                PersistenceHandler::auth_user(
+                                    conn,
+                                    &broker,
+                                    reply_topic,
+                                    (&username, &password),
+                                )
+                                .await;
                             }
                         }
                     }
@@ -177,5 +124,75 @@ impl PersistenceHandler {
         });
 
         Ok(handle)
+    }
+
+    pub async fn get_inventory_ids(
+        conn: &mut PgConnection,
+        broker: &MessageBroker,
+        reply_topic: String,
+    ) {
+        tracing::debug!("received GetInventoryIds query");
+        let reply_body = match user_repository::get_inventory_ids(conn).await {
+            Ok(ids) => MessageBody::PersistenceQueryResponse(QueryResponse::GetInventoryIds(ids)),
+            Err(e) => MessageBody::PersistenceQueryResponse(QueryResponse::GetInventoryIdsFailed(
+                e.to_string(),
+            )),
+        };
+
+        let message = Message {
+            id: Uuid::new_v4(),
+            body: reply_body,
+            topic: Some(reply_topic),
+            is_request: false,
+            timestamp: chrono::Utc::now().timestamp_millis() as u64,
+        };
+
+        if let Err(e) = broker.send(message).await {
+            tracing::error!(
+                error = e.to_string(),
+                "Failed to send persistence query response"
+            );
+        }
+    }
+
+    pub async fn auth_user(
+        conn: &mut PgConnection,
+        broker: &MessageBroker,
+        reply_topic: String,
+        user_data: (&String, &String),
+    ) {
+        let id = user_repository::authenticate(conn, user_data.0, user_data.1)
+            .await
+            .unwrap_or(None);
+
+        let reply = match id {
+            None => Message {
+                id: Uuid::new_v4(),
+                body: MessageBody::PersistenceQueryResponse(QueryResponse::AuthFailed(
+                    "Authentication failed".into(),
+                )),
+                topic: Some(reply_topic),
+                is_request: false,
+                timestamp: chrono::Utc::now().timestamp_millis() as u64,
+            },
+            Some(user_id) => {
+                tracing::info!("User authenticated with ID: {}", user_id);
+                let token = "".into();
+                Message {
+                    id: Uuid::new_v4(),
+                    body: MessageBody::PersistenceQueryResponse(QueryResponse::AuthSuccess(token)),
+                    topic: Some(reply_topic),
+                    is_request: false,
+                    timestamp: chrono::Utc::now().timestamp_millis() as u64,
+                }
+            }
+        };
+
+        if let Err(e) = broker.send(reply).await {
+            tracing::error!(
+                error = e.to_string(),
+                "Failed to send persistence query response"
+            );
+        }
     }
 }
