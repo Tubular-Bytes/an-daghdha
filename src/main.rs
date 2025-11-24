@@ -152,7 +152,10 @@ async fn ws_handler(
 }
 
 async fn handle_socket(mut ws: WebSocket, headers: HeaderMap, state: AppState) {
-    tracing::info!("New WebSocket connection with headers {:?}", headers);
+    tracing::info!(
+        headers = format!("{:?}", headers),
+        "new WebSocket connection"
+    );
 
     let user_id = match token::validate_headers(&headers) {
         Ok(uid) => uid,

@@ -1,0 +1,29 @@
+meta {
+  name: Socket connection
+  type: ws
+  seq: 2
+}
+
+ws {
+  url: http://localhost:3000/rtc
+  body: ws
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer v4.local.vHGgd7Xxflw8f35zo4_bRwR2_pyzu_bNBsOQ65y1M9xDDuKfUn1fPSOuKBAva-rELIS6TcDnWA6B-kGlnTF5DAUy6JBptOhlCZdRlIZ3u2i7Z5jYY56cUV9Zp5WRJDRAN6R0jSPOwI3URaQKXJG7iFh4U7rmnnGY9NH-byyB5i-1wGPjR1PYZlSTQEe9zumiKatjsELZsWfWS1AOfS3BBhJUiT7JyQI7Y92ObtB2qvgMP6Q48-7jGgE0KkjNmVs20JBwYT4CdFYMcbNMkhqicd8E42YIj9qT4IeaHAM
+}
+
+body:ws {
+  name: message 1
+  type: json
+  content: '''
+    {
+      "body": {
+        "build": {
+          "blueprint": "test"
+        }
+      }
+    }
+  '''
+}

@@ -57,6 +57,20 @@ pub async fn authenticate(
     Ok(user_id)
 }
 
+pub async fn get_inventory_id_for_user(
+    conn: &mut PgConnection,
+    user_id: uuid::Uuid,
+) -> Result<uuid::Uuid, diesel::result::Error> {
+    use crate::schema::accounts_x_inventories::dsl::*;
+
+    let ids = accounts_x_inventories
+        .filter(account_id.eq(user_id))
+        .select(inventory_id)
+        .first::<uuid::Uuid>(conn)?;
+
+    Ok(ids)
+}
+
 pub async fn get_inventory_ids(
     conn: &mut PgConnection,
 ) -> Result<Vec<uuid::Uuid>, diesel::result::Error> {

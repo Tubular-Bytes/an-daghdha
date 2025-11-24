@@ -32,6 +32,7 @@ pub struct PersistenceHandler {
 pub enum Query {
     Auth { username: String, password: String },
     GetInventoryIds,
+    GetInventoryForUser { user_id: Uuid },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -42,6 +43,9 @@ pub enum QueryResponse {
 
     GetInventoryIds(Vec<Uuid>),
     GetInventoryIdsFailed(String),
+
+    GetInventoryIdForUser(Uuid),
+    GetInventoryIdForUserFailed(String),
 }
 
 impl Default for PersistenceHandler {
@@ -108,6 +112,15 @@ impl PersistenceHandler {
                                 PersistenceHandler::get_inventory_ids(conn, &broker, reply_topic)
                                     .await;
                             }
+                            Query::GetInventoryForUser { user_id } => {
+                                PersistenceHandler::get_inventory_id_for_user(
+                                    conn,
+                                    &broker,
+                                    reply_topic,
+                                    user_id,
+                                )
+                                .await;
+                            }
                             Query::Auth { username, password } => {
                                 PersistenceHandler::auth_user(
                                     conn,
@@ -143,6 +156,38 @@ impl PersistenceHandler {
             Err(e) => MessageBody::PersistenceQueryResponse(QueryResponse::GetInventoryIdsFailed(
                 e.to_string(),
             )),
+        };
+
+        let message = Message {
+            id: Uuid::new_v4(),
+            body: reply_body,
+            topic: Some(reply_topic),
+            is_request: false,
+            timestamp: chrono::Utc::now().timestamp_millis() as u64,
+        };
+
+        if let Err(e) = broker.send(message).await {
+            tracing::error!(
+                error = e.to_string(),
+                "Failed to send persistence query response"
+            );
+        }
+    }
+
+    pub async fn get_inventory_id_for_user(
+        conn: &mut PgConnection,
+        broker: &MessageBroker,
+        reply_topic: String,
+        user_id: Uuid,
+    ) {
+        tracing::debug!("received GetInventoryIdForUser query");
+        let reply_body = match user_repository::get_inventory_id_for_user(conn, user_id).await {
+            Ok(ids) => {
+                MessageBody::PersistenceQueryResponse(QueryResponse::GetInventoryIdForUser(ids))
+            }
+            Err(e) => MessageBody::PersistenceQueryResponse(
+                QueryResponse::GetInventoryIdForUserFailed(e.to_string()),
+            ),
         };
 
         let message = Message {
