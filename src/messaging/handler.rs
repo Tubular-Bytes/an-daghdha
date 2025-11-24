@@ -53,10 +53,23 @@ impl MessageHandler {
         if let Some(topic) = &message.topic {
             let subscriptions = self.subscriptions.read().await;
             for subscription in subscriptions.iter() {
+                tracing::debug!(
+                    topic,
+                    subscription = subscription.pattern.as_str(),
+                    "checking for subscriptions"
+                );
+
                 if subscription.pattern.is_match(topic) {
                     if let Err(e) = subscription.tx.send(message.clone()).await {
                         tracing::warn!("Failed to send message to subscriber: {}", e);
+                        continue;
                     }
+
+                    tracing::debug!(
+                        topic = topic.as_str(),
+                        subscription_id = subscription.id.to_string(),
+                        "Message forwarded to subscriber"
+                    );
                 }
             }
         }

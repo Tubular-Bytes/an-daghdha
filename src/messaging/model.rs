@@ -4,12 +4,20 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+use crate::persistence::{Query, QueryResponse};
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     Unstarted,
     Running,
     Stopping,
     Stopped,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PersistenceRecord {
+    // Placeholder for actual record types
+    Dummy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +35,9 @@ pub enum MessageBody {
     BuildResponse(Result<String, String>),
 
     DebugMessage(String),
+
+    PersistenceQueryRequest(Query),
+    PersistenceQueryResponse(QueryResponse),
 
     Stop,
     Empty,
@@ -109,6 +120,10 @@ impl Message {
             is_request,
             timestamp: chrono::Utc::now().timestamp_millis() as u64,
         }
+    }
+
+    pub fn new_request(body: MessageBody, topic: Option<String>) -> Self {
+        Self::new(body, topic, true)
     }
 
     pub fn reply_topic(&self) -> String {

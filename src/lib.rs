@@ -2,6 +2,9 @@ pub mod actor;
 pub mod auth;
 pub mod error;
 pub mod messaging;
+pub mod model;
+pub mod persistence;
+pub mod schema;
 pub mod websocket;
 
 #[derive(Clone)]

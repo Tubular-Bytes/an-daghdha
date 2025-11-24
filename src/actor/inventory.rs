@@ -11,11 +11,17 @@ pub struct InventoryActorHandler {
 
 impl InventoryActorHandler {
     pub async fn listen(&self, broker: MessageBroker) -> Result<(), anyhow::Error> {
-        let (sub_id, mut rx) = match broker
-            .subscribe(format!("inventory:{}", self.id).as_str())
-            .await
-        {
-            Ok(id) => id,
+        let topic = format!("in:inventory:{}", self.id);
+        let (sub_id, mut rx) = match broker.subscribe(topic.as_str()).await {
+            Ok(id) => {
+                tracing::debug!(
+                    actor_id = self.id.to_string(),
+                    topic,
+                    sub_id = id.0.to_string(),
+                    "inventory actor subscribed to incoming messages"
+                );
+                id
+            }
             Err(e) => {
                 eprintln!("Failed to subscribe to inventory channel: {}", e);
                 return Err(anyhow::anyhow!("Failed to subscribe to inventory channel"));

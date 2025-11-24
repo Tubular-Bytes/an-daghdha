@@ -1,7 +1,5 @@
-CREATE TABLE blueprints (
+CREATE TABLE inventories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
-    blueprint JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
