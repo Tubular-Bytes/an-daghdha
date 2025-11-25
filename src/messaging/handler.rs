@@ -47,13 +47,13 @@ impl MessageHandler {
     }
 
     pub async fn handle_message(&mut self, message: Message) {
-        tracing::info!("Handling message: {:?}", message);
+        tracing::trace!(message=format!("{:?}", message), "handling message");
 
         // Forward message to all matching subscriptions
         if let Some(topic) = &message.topic {
             let subscriptions = self.subscriptions.read().await;
             for subscription in subscriptions.iter() {
-                tracing::debug!(
+                tracing::trace!(
                     topic,
                     subscription = subscription.pattern.as_str(),
                     "checking for subscriptions"
@@ -68,7 +68,7 @@ impl MessageHandler {
                     tracing::debug!(
                         topic = topic.as_str(),
                         subscription_id = subscription.id.to_string(),
-                        "Message forwarded to subscriber"
+                        "message forwarded to subscriber"
                     );
                 }
             }

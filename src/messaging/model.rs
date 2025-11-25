@@ -39,6 +39,7 @@ pub enum MessageBody {
     PersistenceQueryRequest(Query),
     PersistenceQueryResponse(QueryResponse),
 
+    Tick{seq: u64, timestamp: chrono::DateTime<chrono::Utc>},
     Stop,
     Empty,
 }
