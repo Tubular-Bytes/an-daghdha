@@ -125,7 +125,22 @@ impl InventoryActorHandler {
                         actor_id = self.id.to_string(),
                         "Inventory actor received tick"
                     );
-                    // Handle tick event, e.g., update inventory status
+
+                    let response = subbroker
+                        .request(Message::new_request(
+                            MessageBody::PersistenceQueryRequest(Query::ProgressBuildings {
+                                inventory_id: self.id,
+                            }),
+                            Some("persistence".into()),
+                        ))
+                        .await?;
+
+                    tracing::info!(
+                        actor_id = self.id.to_string(),
+                        "Inventory actor processed tick {}: persistence response: {:?}",
+                        seq,
+                        response
+                    );
                 }
                 _ => tracing::warn!("Unexpected message body: {:?}", msg.body),
             }

@@ -159,8 +159,14 @@ impl PersistenceHandler {
                                 )
                                 .await;
                             }
-                            Query::ProgressBuildings { .. } => {
-                                // To be implemented
+                            Query::ProgressBuildings { inventory_id } => {
+                                PersistenceHandler::progress_buildings(
+                                    conn,
+                                    &broker,
+                                    reply_topic,
+                                    inventory_id,
+                                )
+                                .await;
                             }
                         }
                     }
@@ -296,6 +302,33 @@ impl PersistenceHandler {
             }
         };
 
+        let reply = Message::new(reply, Some(reply_topic), false);
+        if let Err(e) = broker.send(reply).await {
+            tracing::error!(
+                error = e.to_string(),
+                "Failed to send persistence query response"
+            );
+        }
+    }
+
+    pub async fn progress_buildings(
+        conn: &mut PgConnection,
+        broker: &MessageBroker,
+        reply_topic: String,
+        inventory_id: Uuid,
+    ) {
+        let reply: MessageBody = match inventory_repository::process_building_ticks(conn, inventory_id).await
+        {
+            Ok(_) => {
+                // No specific response needed for progress operation
+                MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(inventory_id))
+            }
+            Err(e) => {
+                MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuildingFailed(
+                    e.to_string(),
+                ))
+            }
+        };
 
         let reply = Message::new(reply, Some(reply_topic), false);
         if let Err(e) = broker.send(reply).await {
