@@ -32,7 +32,7 @@ pub struct AccountSession {
     pub expires_at: Option<chrono::NaiveDateTime>,
 }
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::inventories_x_buildings)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct InventoryBuilding {

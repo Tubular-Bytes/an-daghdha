@@ -4,6 +4,8 @@ use diesel::prelude::*;
 use diesel::PgConnection;
 use uuid::Uuid;
 
+use crate::model::InventoryBuilding;
+
 enum Status {
     InProgress,
     Completed,
@@ -39,22 +41,20 @@ pub async fn create_building(
 ) -> Result<Uuid, diesel::result::Error> {
     use crate::schema::inventories_x_buildings;
 
-    // TODO return from query
-    let id = Uuid::new_v4();
+    let new_building = InventoryBuilding {
+        id: Uuid::new_v4(),
+        inventory_id,
+        blueprint_slug: blueprint_slug,
+        status: Status::InProgress.to_string(),
+        progress: 0,
+        created_at: chrono::Utc::now().naive_utc(),
+        updated_at: chrono::Utc::now().naive_utc(),
+    };
 
-    let new_building = (
-        inventories_x_buildings::id.eq(id),
-        inventories_x_buildings::inventory_id.eq(inventory_id),
-        inventories_x_buildings::blueprint_slug.eq(blueprint_slug),
-        inventories_x_buildings::status.eq(Status::InProgress.to_string()),
-        inventories_x_buildings::progress.eq(0),
-        inventories_x_buildings::created_at.eq(chrono::Utc::now().naive_utc()),
-        inventories_x_buildings::updated_at.eq(chrono::Utc::now().naive_utc()),
-    );
-
-    diesel::insert_into(inventories_x_buildings::table)
+    let id = diesel::insert_into(inventories_x_buildings::table)
         .values(&new_building)
-        .execute(conn)?;
+        .returning(inventories_x_buildings::id)
+        .get_result(conn)?;
 
     Ok(id)
 }
