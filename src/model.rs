@@ -31,3 +31,16 @@ pub struct AccountSession {
     pub updated_at: Option<chrono::NaiveDateTime>,
     pub expires_at: Option<chrono::NaiveDateTime>,
 }
+
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::inventories_x_buildings)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct InventoryBuilding {
+    pub id: Uuid,
+    pub inventory_id: Uuid,
+    pub blueprint_slug: String,
+    pub status: String,
+    pub progress: i32,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}

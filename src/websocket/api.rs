@@ -224,10 +224,10 @@ impl Bouncer {
                 );
 
                 let message = match request.body {
-                    RtcRequestBody::Build { blueprint_id } => BusMessage::new(
+                    RtcRequestBody::Build { blueprint } => BusMessage::new(
                         MessageBody::BuildRequest {
                             inventory_id,
-                            blueprint_id,
+                            blueprint_slug: blueprint,
                         },
                         Some(format!("in:inventory:{}", inventory_id)),
                         true,

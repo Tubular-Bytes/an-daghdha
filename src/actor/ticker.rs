@@ -23,18 +23,23 @@ const TICKER_INTERVAL_MILLISECS: u64 = 1000;
 
 impl TickerActorHandler {
     pub fn new() -> Self {
-        TickerActorHandler { id: Uuid::new_v4(), seq: Arc::new(Mutex::new(0)) }
+        TickerActorHandler {
+            id: Uuid::new_v4(),
+            seq: Arc::new(Mutex::new(0)),
+        }
     }
 
     pub async fn start(&self, broker: MessageBroker) -> Result<JoinHandle<()>, anyhow::Error> {
         let seq = Arc::clone(&self.seq);
         let broker = broker.clone();
-        
+
         let handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(TICKER_INTERVAL_MILLISECS));
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(
+                TICKER_INTERVAL_MILLISECS,
+            ));
             loop {
                 interval.tick().await;
-                
+
                 // Increment and get seq
                 let current_seq = {
                     let mut seq_guard = match seq.lock() {
@@ -47,7 +52,7 @@ impl TickerActorHandler {
                     *seq_guard = seq_guard.wrapping_add(1);
                     *seq_guard
                 };
-                
+
                 let msg = Message::new(
                     MessageBody::Tick {
                         seq: current_seq,
@@ -56,7 +61,7 @@ impl TickerActorHandler {
                     Some("ticks".into()),
                     false,
                 );
-                
+
                 if let Err(e) = broker.send(msg).await {
                     tracing::error!("failed to publish ticker tick message: {}", e);
                 } else {

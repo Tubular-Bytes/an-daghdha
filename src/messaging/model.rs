@@ -30,16 +30,19 @@ pub enum MessageBody {
 
     BuildRequest {
         inventory_id: Uuid,
-        blueprint_id: String,
+        blueprint_slug: String,
     },
-    BuildResponse(Result<String, String>),
+    BuildResponse(Result<Uuid, String>),
 
     DebugMessage(String),
 
     PersistenceQueryRequest(Query),
     PersistenceQueryResponse(QueryResponse),
 
-    Tick{seq: u64, timestamp: chrono::DateTime<chrono::Utc>},
+    Tick {
+        seq: u64,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
     Stop,
     Empty,
 }
@@ -88,14 +91,14 @@ impl MessageBody {
                         anyhow::anyhow!("Missing or invalid 'inventory_id' in build message")
                     })?;
 
-                let blueprint_id = body
-                    .get("blueprint_id")
+                let blueprint_slug = body
+                    .get("blueprint_slug")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
 
                 Ok(Self::BuildRequest {
                     inventory_id,
-                    blueprint_id: blueprint_id.into(),
+                    blueprint_slug: blueprint_slug.into(),
                 })
             }
             _ => Err(anyhow::anyhow!("Unknown message body kind: {}", kind)),
@@ -129,6 +132,23 @@ impl Message {
 
     pub fn reply_topic(&self) -> String {
         format!("reply-{}", self.id)
+    }
+
+    pub fn kind(&self) -> String {
+        match &self.body {
+            MessageBody::AuthenticationRequest { .. } => "MessageBody::AuthenticationRequest".to_string(),
+            MessageBody::AuthenticationResponse(_) => "MessageBody::AuthenticationResponse".to_string(),
+            MessageBody::BuildRequest { .. } => "MessageBody::BuildRequest".to_string(),
+            MessageBody::BuildResponse(_) => "MessageBody::BuildResponse".to_string(),
+            MessageBody::DebugMessage(_) => "MessageBody::DebugMessage".to_string(),
+            MessageBody::PersistenceQueryRequest(_) => "MessageBody::PersistenceQueryRequest".to_string(),
+            MessageBody::PersistenceQueryResponse(_) => {
+                "MessageBody::PersistenceQueryResponse".to_string()
+            }
+            MessageBody::Tick { .. } => "MessageBody::Tick".to_string(),
+            MessageBody::Stop => "MessageBody::Stop".to_string(),
+            MessageBody::Empty => "MessageBody::Empty".to_string(),
+        }
     }
 }
 

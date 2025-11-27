@@ -155,7 +155,10 @@ async fn handle_socket(mut ws: WebSocket, headers: HeaderMap, state: AppState) {
     state.bouncer.handle_connection(user_id, ws).await;
 }
 
-pub async fn init_persistence(broker: &MessageBroker, database_url: &str) -> Result<JoinHandle<()>, anyhow::Error> {
+pub async fn init_persistence(
+    broker: &MessageBroker,
+    database_url: &str,
+) -> Result<JoinHandle<()>, anyhow::Error> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = Pool::builder().build(manager)?;
 
