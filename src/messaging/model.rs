@@ -136,12 +136,18 @@ impl Message {
 
     pub fn kind(&self) -> String {
         match &self.body {
-            MessageBody::AuthenticationRequest { .. } => "MessageBody::AuthenticationRequest".to_string(),
-            MessageBody::AuthenticationResponse(_) => "MessageBody::AuthenticationResponse".to_string(),
+            MessageBody::AuthenticationRequest { .. } => {
+                "MessageBody::AuthenticationRequest".to_string()
+            }
+            MessageBody::AuthenticationResponse(_) => {
+                "MessageBody::AuthenticationResponse".to_string()
+            }
             MessageBody::BuildRequest { .. } => "MessageBody::BuildRequest".to_string(),
             MessageBody::BuildResponse(_) => "MessageBody::BuildResponse".to_string(),
             MessageBody::DebugMessage(_) => "MessageBody::DebugMessage".to_string(),
-            MessageBody::PersistenceQueryRequest(_) => "MessageBody::PersistenceQueryRequest".to_string(),
+            MessageBody::PersistenceQueryRequest(_) => {
+                "MessageBody::PersistenceQueryRequest".to_string()
+            }
             MessageBody::PersistenceQueryResponse(_) => {
                 "MessageBody::PersistenceQueryResponse".to_string()
             }

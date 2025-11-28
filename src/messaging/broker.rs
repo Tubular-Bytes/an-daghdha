@@ -53,7 +53,11 @@ impl MessageBroker {
 
         let broker = self.clone();
 
-        tracing::debug!(kind=message.kind(), topic=reply_topic, "spawning reply handler for topic");
+        tracing::debug!(
+            kind = message.kind(),
+            topic = reply_topic,
+            "spawning reply handler for topic"
+        );
 
         let topic = reply_topic.clone();
         tokio::spawn(async move {

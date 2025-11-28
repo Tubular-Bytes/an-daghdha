@@ -45,7 +45,7 @@ pub enum Query {
     },
     ProgressBuildings {
         inventory_id: Uuid,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -290,17 +290,15 @@ impl PersistenceHandler {
     ) {
         tracing::debug!("received CreateBuilding query");
 
-        let reply: MessageBody = match inventory_repository::create_building(conn, inventory_id, blueprint_slug.clone()).await
-        {
-            Ok(id) => {
-                MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(id))
-            }
-            Err(e) => {
-                MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuildingFailed(
-                    e.to_string(),
-                ))
-            }
-        };
+        let reply: MessageBody =
+            match inventory_repository::create_building(conn, inventory_id, blueprint_slug.clone())
+                .await
+            {
+                Ok(id) => MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(id)),
+                Err(e) => MessageBody::PersistenceQueryResponse(
+                    QueryResponse::CreateBuildingFailed(e.to_string()),
+                ),
+            };
 
         let reply = Message::new(reply, Some(reply_topic), false);
         if let Err(e) = broker.send(reply).await {
@@ -317,18 +315,18 @@ impl PersistenceHandler {
         reply_topic: String,
         inventory_id: Uuid,
     ) {
-        let reply: MessageBody = match inventory_repository::process_building_ticks(conn, inventory_id).await
-        {
-            Ok(_) => {
-                // No specific response needed for progress operation
-                MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(inventory_id))
-            }
-            Err(e) => {
-                MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuildingFailed(
-                    e.to_string(),
-                ))
-            }
-        };
+        let reply: MessageBody =
+            match inventory_repository::process_building_ticks(conn, inventory_id).await {
+                Ok(_) => {
+                    // No specific response needed for progress operation
+                    MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(
+                        inventory_id,
+                    ))
+                }
+                Err(e) => MessageBody::PersistenceQueryResponse(
+                    QueryResponse::CreateBuildingFailed(e.to_string()),
+                ),
+            };
 
         let reply = Message::new(reply, Some(reply_topic), false);
         if let Err(e) = broker.send(reply).await {

@@ -44,7 +44,7 @@ pub async fn create_building(
     let new_building = InventoryBuilding {
         id: Uuid::new_v4(),
         inventory_id,
-        blueprint_slug: blueprint_slug,
+        blueprint_slug,
         status: Status::InProgress.to_string(),
         progress: 0,
         created_at: chrono::Utc::now().naive_utc(),
@@ -68,22 +68,26 @@ pub async fn process_building_ticks(
     // Use a transaction to ensure atomicity
     conn.transaction(|conn| {
         // First increase the progress counter
-        diesel::update(inventories_x_buildings
-            .filter(inventory_id.eq(inventory)))
+        diesel::update(inventories_x_buildings.filter(inventory_id.eq(inventory)))
             .filter(status.eq("in_progress"))
-            .set((progress.eq(progress + 1), updated_at.eq(chrono::Utc::now().naive_utc())))
+            .set((
+                progress.eq(progress + 1),
+                updated_at.eq(chrono::Utc::now().naive_utc()),
+            ))
             .execute(conn)?;
 
         // Then mark buildings as completed if they have reached required ticks
-        diesel::sql_query(r"UPDATE inventories_x_buildings AS ixb
+        diesel::sql_query(
+            r"UPDATE inventories_x_buildings AS ixb
             SET status = 'completed'
             FROM blueprints AS b
             WHERE ixb.inventory_id = $1
                 AND b.slug = ixb.blueprint_slug
                 AND (b.properties->>'ticks_required') ~ '^\d+$'
-                AND ixb.progress >= COALESCE(NULLIF(b.properties->>'ticks_required','')::int, 0);")
-            .bind::<diesel::sql_types::Uuid, _>(inventory)
-            .execute(conn)?;
+                AND ixb.progress >= COALESCE(NULLIF(b.properties->>'ticks_required','')::int, 0);",
+        )
+        .bind::<diesel::sql_types::Uuid, _>(inventory)
+        .execute(conn)?;
 
         diesel::result::QueryResult::Ok(())
     })?;
