@@ -67,7 +67,7 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&request).unwrap();
-        let expected = r#"{"body":{"build":{"blueprint_id":"example_blueprint"}}}"#;
+        let expected = r#"{"body":{"build":{"blueprint":"example_blueprint"}}}"#;
         assert_eq!(serialized, expected);
 
         let deserialized: RtcRequest = serde_json::from_str(&serialized).unwrap();
