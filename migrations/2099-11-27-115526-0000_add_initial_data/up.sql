@@ -5,4 +5,13 @@ insert into inventories ("id") values (gen_random_uuid());
 
 insert into accounts_x_inventories (account_id, inventory_id) select a.id as account_id, i.id as inventory_id from accounts as a join inventories as i on 1 = 1 LIMIT 1;
 
+insert into blueprints (slug, name, properties)
+    values ('test', 'Test Blueprint', '{"ticks_required": 10}'::jsonb);
 
+insert into inventories_x_buildings (inventory_id, blueprint_slug, progress, status)
+    values (
+        (select inventory_id from accounts_x_inventories limit 1),
+        'test',
+        0,
+        'in_progress'
+    );
