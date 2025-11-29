@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use crate::messaging::broker::MessageBroker;
 use crate::messaging::model::{Message, MessageBody};
-use crate::persistence::{Query, QueryResponse};
+use crate::persistence::Query;
+
+mod handler;
 
 pub struct InventoryActorHandler {
     pub id: Uuid,
@@ -72,47 +74,9 @@ impl InventoryActorHandler {
                         blueprint_slug
                     );
 
-                    let build_response: MessageBody = match subbroker
-                        .request(Message::new_request(
-                            MessageBody::PersistenceQueryRequest(Query::CreateBuilding {
-                                inventory_id,
-                                blueprint_slug: blueprint_slug.clone(),
-                            }),
-                            Some("persistence".into()),
-                        ))
-                        .await
-                    {
-                        Ok(response_msg) => match response_msg {
-                            Some(response) => match response.body {
-                                MessageBody::PersistenceQueryResponse(query_response) => {
-                                    match query_response {
-                                        QueryResponse::CreateBuilding(building_id) => {
-                                            MessageBody::BuildResponse(Ok(building_id))
-                                        }
-                                        QueryResponse::CreateBuildingFailed(e) => {
-                                            MessageBody::BuildResponse(Err(format!(
-                                                "Failed to create building: {}",
-                                                e
-                                            )))
-                                        }
-                                        _ => MessageBody::BuildResponse(Err(
-                                            "Unexpected query response".into(),
-                                        )),
-                                    }
-                                }
-                                _ => MessageBody::BuildResponse(Err(
-                                    "Unexpected response body".into()
-                                )),
-                            },
-                            None => MessageBody::BuildResponse(Err(
-                                "No response received from persistence".into(),
-                            )),
-                        },
-                        Err(e) => MessageBody::BuildResponse(Err(format!(
-                            "Failed to send persistence request: {}",
-                            e
-                        ))),
-                    };
+                    let build_response =
+                        handler::handle_build_request(&subbroker, inventory_id, blueprint_slug)
+                            .await;
 
                     let reply = Message::new(build_response, Some(reply_topic.clone()), false);
 
@@ -135,7 +99,7 @@ impl InventoryActorHandler {
                         ))
                         .await?;
 
-                    tracing::info!(
+                    tracing::trace!(
                         actor_id = self.id.to_string(),
                         "Inventory actor processed tick {}: persistence response: {:?}",
                         seq,
