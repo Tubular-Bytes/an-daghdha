@@ -3,7 +3,7 @@ use crate::messaging::model::{Message, MessageBody};
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum RtcRequestBody {
     #[serde(rename = "build")]
-    Build { blueprint_id: String },
+    Build { blueprint: String },
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -37,7 +37,7 @@ impl RtcResponse {
                 Ok(building) => Self {
                     id: msg.id,
                     success: true,
-                    message: Some(building),
+                    message: Some(building.to_string()),
                 },
                 Err(err_msg) => Self {
                     id: msg.id,
@@ -62,18 +62,18 @@ mod tests {
     fn test_rtc_request_serialization() {
         let request = RtcRequest {
             body: RtcRequestBody::Build {
-                blueprint_id: "example_blueprint".to_string(),
+                blueprint: "example_blueprint".to_string(),
             },
         };
 
         let serialized = serde_json::to_string(&request).unwrap();
-        let expected = r#"{"body":{"build":{"blueprint_id":"example_blueprint"}}}"#;
+        let expected = r#"{"body":{"build":{"blueprint":"example_blueprint"}}}"#;
         assert_eq!(serialized, expected);
 
         let deserialized: RtcRequest = serde_json::from_str(&serialized).unwrap();
         match deserialized.body {
-            RtcRequestBody::Build { blueprint_id } => {
-                assert_eq!(blueprint_id, "example_blueprint");
+            RtcRequestBody::Build { blueprint } => {
+                assert_eq!(blueprint, "example_blueprint");
             }
         }
     }

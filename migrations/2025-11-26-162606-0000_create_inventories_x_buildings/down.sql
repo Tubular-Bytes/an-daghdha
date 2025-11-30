@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS inventories_x_buildings CASCADE;

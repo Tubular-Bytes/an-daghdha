@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
+mod inventory_repository;
 mod user_repository;
 
 use crate::messaging::{
@@ -30,9 +31,21 @@ pub struct PersistenceHandler {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Query {
-    Auth { username: String, password: String },
+    Auth {
+        username: String,
+        password: String,
+    },
     GetInventoryIds,
-    GetInventoryForUser { user_id: Uuid },
+    GetInventoryForUser {
+        user_id: Uuid,
+    },
+    CreateBuilding {
+        inventory_id: Uuid,
+        blueprint_slug: String,
+    },
+    ProgressBuildings {
+        inventory_id: Uuid,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -46,6 +59,9 @@ pub enum QueryResponse {
 
     GetInventoryIdForUser(Uuid),
     GetInventoryIdForUserFailed(String),
+
+    CreateBuilding(Uuid),
+    CreateBuildingFailed(String),
 }
 
 impl Default for PersistenceHandler {
@@ -105,7 +121,7 @@ impl PersistenceHandler {
                 let conn = &mut pool.get().expect("Failed to get DB connection from pool");
                 match msg.body {
                     MessageBody::PersistenceQueryRequest(query) => {
-                        tracing::info!("Querying persistence data with query: {:?}", query);
+                        tracing::info!(query = ?query, "querying persistence data with query");
 
                         match query {
                             Query::GetInventoryIds => {
@@ -127,6 +143,28 @@ impl PersistenceHandler {
                                     &broker,
                                     reply_topic,
                                     (&username, &password),
+                                )
+                                .await;
+                            }
+                            Query::CreateBuilding {
+                                inventory_id,
+                                blueprint_slug,
+                            } => {
+                                PersistenceHandler::create_building(
+                                    conn,
+                                    &broker,
+                                    reply_topic,
+                                    inventory_id,
+                                    blueprint_slug,
+                                )
+                                .await;
+                            }
+                            Query::ProgressBuildings { inventory_id } => {
+                                PersistenceHandler::progress_buildings(
+                                    conn,
+                                    &broker,
+                                    reply_topic,
+                                    inventory_id,
                                 )
                                 .await;
                             }
@@ -233,6 +271,62 @@ impl PersistenceHandler {
                 }
             }
         };
+
+        let reply = Message::new(reply, Some(reply_topic), false);
+        if let Err(e) = broker.send(reply).await {
+            tracing::error!(
+                error = e.to_string(),
+                "Failed to send persistence query response"
+            );
+        }
+    }
+
+    pub async fn create_building(
+        conn: &mut PgConnection,
+        broker: &MessageBroker,
+        reply_topic: String,
+        inventory_id: Uuid,
+        blueprint_slug: String,
+    ) {
+        tracing::debug!("received CreateBuilding query");
+
+        let reply: MessageBody =
+            match inventory_repository::create_building(conn, inventory_id, blueprint_slug.clone())
+                .await
+            {
+                Ok(id) => MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(id)),
+                Err(e) => MessageBody::PersistenceQueryResponse(
+                    QueryResponse::CreateBuildingFailed(e.to_string()),
+                ),
+            };
+
+        let reply = Message::new(reply, Some(reply_topic), false);
+        if let Err(e) = broker.send(reply).await {
+            tracing::error!(
+                error = e.to_string(),
+                "Failed to send persistence query response"
+            );
+        }
+    }
+
+    pub async fn progress_buildings(
+        conn: &mut PgConnection,
+        broker: &MessageBroker,
+        reply_topic: String,
+        inventory_id: Uuid,
+    ) {
+        let reply: MessageBody =
+            match inventory_repository::process_building_ticks(conn, inventory_id).await {
+                Ok(_) => {
+                    // No specific response needed for progress operation
+                    MessageBody::PersistenceQueryResponse(QueryResponse::CreateBuilding(
+                        inventory_id,
+                    ))
+                }
+                Err(e) => MessageBody::PersistenceQueryResponse(
+                    QueryResponse::CreateBuildingFailed(e.to_string()),
+                ),
+            };
 
         let reply = Message::new(reply, Some(reply_topic), false);
         if let Err(e) = broker.send(reply).await {

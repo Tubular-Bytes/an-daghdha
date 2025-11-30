@@ -18,6 +18,7 @@ use tokio::signal;
 
 use an_daghdha::auth::token;
 use an_daghdha::websocket::api;
+use tokio::task::JoinHandle;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -29,40 +30,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let (broker, mut handler) = MessageBroker::new();
 
-    let task_handler = tokio::spawn(async move {
+    let task_handle = tokio::spawn(async move {
         handler.start().await;
     });
 
     let bouncer = api::Bouncer::new(&broker);
 
+    let ticker = an_daghdha::actor::ticker::TickerActorHandler::new();
+    let ticker_handle = ticker.start(broker.clone()).await?;
+
     let database_url = std::env::var("DATABASE_URL")
         .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable not set"))?;
 
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    let pool = Pool::builder().build(manager)?;
-
-    let mut persistence_handler = an_daghdha::persistence::PersistenceHandler::new();
-    let persistence_handle = persistence_handler.listen(&broker, &pool).await?;
-
-    for i in 0..5 {
-        tracing::debug!(
-            "[{}/5] waiting for persistence handler to start listening...",
-            i + 1
-        );
-        match persistence_handler.status.read() {
-            Ok(s) => {
-                if *s == HandlerStatus::Listening {
-                    break;
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to read persistence handler status: {}", e);
-                continue;
-            }
-        };
-
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
+    let persistence_handle = init_persistence(&broker, &database_url).await?;
 
     let auth_actor = an_daghdha::actor::auth::AuthActorHandler::new();
 
@@ -138,8 +118,10 @@ async fn main() -> Result<(), anyhow::Error> {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
-    task_handler.await?;
+    task_handle.await?;
+    ticker_handle.await?;
     persistence_handle.await?;
+
     Ok(())
 }
 
@@ -171,4 +153,37 @@ async fn handle_socket(mut ws: WebSocket, headers: HeaderMap, state: AppState) {
     };
 
     state.bouncer.handle_connection(user_id, ws).await;
+}
+
+pub async fn init_persistence(
+    broker: &MessageBroker,
+    database_url: &str,
+) -> Result<JoinHandle<()>, anyhow::Error> {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = Pool::builder().build(manager)?;
+
+    let mut persistence_handler = an_daghdha::persistence::PersistenceHandler::new();
+    let persistence_handle = persistence_handler.listen(broker, &pool).await?;
+
+    for i in 0..5 {
+        tracing::debug!(
+            "[{}/5] waiting for persistence handler to start listening...",
+            i + 1
+        );
+        match persistence_handler.status.read() {
+            Ok(s) => {
+                if *s == HandlerStatus::Listening {
+                    break;
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to read persistence handler status: {}", e);
+                continue;
+            }
+        };
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    Ok(persistence_handle)
 }

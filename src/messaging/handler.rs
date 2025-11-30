@@ -4,6 +4,17 @@ use tokio::sync::{mpsc, RwLock};
 
 use super::model::{Message, MessageBody, Status, Subscription};
 
+fn is_ignored(topic: &str) -> bool {
+    let ignored_topics = vec!["ticks"];
+
+    for pat in ignored_topics {
+        if topic.contains(pat) {
+            return true;
+        }
+    }
+    false
+}
+
 pub struct MessageHandler {
     status: Arc<RwLock<Status>>,
     inbox: mpsc::Receiver<Message>,
@@ -47,13 +58,13 @@ impl MessageHandler {
     }
 
     pub async fn handle_message(&mut self, message: Message) {
-        tracing::info!("Handling message: {:?}", message);
+        tracing::trace!(message = format!("{:?}", message), "handling message");
 
         // Forward message to all matching subscriptions
         if let Some(topic) = &message.topic {
             let subscriptions = self.subscriptions.read().await;
             for subscription in subscriptions.iter() {
-                tracing::debug!(
+                tracing::trace!(
                     topic,
                     subscription = subscription.pattern.as_str(),
                     "checking for subscriptions"
@@ -65,11 +76,13 @@ impl MessageHandler {
                         continue;
                     }
 
-                    tracing::debug!(
-                        topic = topic.as_str(),
-                        subscription_id = subscription.id.to_string(),
-                        "Message forwarded to subscriber"
-                    );
+                    if !is_ignored(topic) {
+                        tracing::debug!(
+                            topic = topic.as_str(),
+                            subscription_id = subscription.id.to_string(),
+                            "message forwarded to subscriber"
+                        );
+                    }
                 }
             }
         }
